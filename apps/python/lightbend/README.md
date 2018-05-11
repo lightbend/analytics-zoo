@@ -19,6 +19,7 @@ $ export MASTER=local[*]
 
 1. Python3
 2. Anaconda
+3. Spark 2.2
 
 ## Patch spark-env.sh
 
