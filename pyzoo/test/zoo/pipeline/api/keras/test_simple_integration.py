@@ -52,7 +52,7 @@ class TestSimpleIntegration(ZooTestCase):
         np.testing.assert_allclose((10, ), output_shapes[1][1:])
         shutil.rmtree(tmp_log_dir)
 
-    def test_training_with_tensorboard_checkpoint(self):
+    def test_training_with_tensorboard_checkpoint_gradientclipping(self):
         model = Sequential()
         model.add(Dense(8, input_shape=(32, 32, )))
         model.add(Flatten())
@@ -69,6 +69,11 @@ class TestSimpleIntegration(ZooTestCase):
         os.mkdir(tmp_checkpoint_path)
         model.set_tensorboard(tmp_log_dir, "training_test")
         model.set_checkpoint(tmp_checkpoint_path)
+        model.set_constant_gradient_clipping(0.01, 0.03)
+        model.fit(X_train, y_train, batch_size=112, nb_epoch=2, validation_data=(X_test, y_test))
+        model.clear_gradient_clipping()
+        model.fit(X_train, y_train, batch_size=112, nb_epoch=2, validation_data=(X_test, y_test))
+        model.set_gradient_clipping_by_l2_norm(0.2)
         model.fit(X_train, y_train, batch_size=112, nb_epoch=2, validation_data=(X_test, y_test))
         model.evaluate(X_test, y_test, batch_size=112)
         model.predict(X_test)
@@ -111,6 +116,56 @@ class TestSimpleIntegration(ZooTestCase):
         from zoo.pipeline.api.utils import remove_batch
         assert remove_batch([2, 3, 4]) == [3, 4]
         assert remove_batch([[2, 6, 7], [2, 3, 4]]) == [[6, 7], [3, 4]]
+
+    def test_sequential_to_model(self):
+        seq = Sequential()
+        seq.add(Dense(8, input_shape=(32, 32, )))
+        seq.add(Flatten())
+        seq.add(Dense(4, activation="softmax"))
+        seq.to_model()
+
+    def test_keras_net_layers(self):
+        x1 = Input(shape=(8, ))
+        x2 = Input(shape=(6, ))
+        y1 = Dense(10)(x1)
+        y2 = Dense(10)(x2)
+        model = Model([x1, x2], [y1, y2])
+        assert len(model.layers) == 4
+
+    def test_keras_net_flatten_layers(self):
+        x1 = Input(shape=(8, ))
+        x2 = Input(shape=(6, ))
+        y1 = Dense(10)(x1)
+        y2 = Dense(10)(x2)
+        model = Model([x1, x2], [y1, y2])
+        assert len(model.flattened_layers()) == 4
+
+    def test_create_image_config(self):
+        from zoo.models.image.common.image_config import ImageConfigure
+        from zoo.feature.image.imagePreprocessing import ImageResize
+        from zoo.feature.common import ChainedPreprocessing
+        ImageConfigure(
+            pre_processor=ImageResize(224, 224))
+        ImageConfigure(
+            pre_processor=ChainedPreprocessing([ImageResize(224, 224), ImageResize(224, 224)]))
+
+    def test_model_summary_sequential(self):
+        model = Sequential()
+        model.add(LSTM(input_shape=(16, 32), output_dim=8, return_sequences=True))
+        model.add(Dropout(0.2))
+        model.add(LSTM(32, return_sequences=True))
+        model.add(Dropout(0.2))
+        model.add(LSTM(15, return_sequences=False))
+        model.add(Dropout(0.2))
+        model.add(Dense(output_dim=1))
+        model.summary()
+
+    def test_model_summary_graph(self):
+        x = Input(shape=(8, ))
+        y = Dense(10)(x)
+        z = Dense(12)(y)
+        model = Model(x, z)
+        model.summary()
 
 
 if __name__ == "__main__":

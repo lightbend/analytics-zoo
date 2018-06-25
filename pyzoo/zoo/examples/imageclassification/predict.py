@@ -15,8 +15,8 @@
 #
 
 from optparse import OptionParser
-from zoo.common.nncontext import get_nncontext
-from zoo.models.image.imageclassification.image_classification import *
+from zoo.common.nncontext import init_nncontext
+from zoo.models.image.imageclassification import *
 
 
 def predict(model_path, img_path, topN):
@@ -31,7 +31,7 @@ def predict(model_path, img_path, topN):
     predicts = output.get_predict().collect()
     for predict in predicts:
         (uri, probs) = predict
-        sortedProbs = [(prob, index) for index, prob in enumerate(probs)]
+        sortedProbs = [(prob, index) for index, prob in enumerate(probs[0])]
         sortedProbs.sort()
         print("Image : %s, top %d prediction result" % (uri, topN))
         for i in range(topN):
@@ -47,6 +47,6 @@ if __name__ == "__main__":
     parser.add_option("--topN", type=int, dest="topN", default=1, help="top N number")
     (options, args) = parser.parse_args(sys.argv)
 
-    sc = get_nncontext(create_spark_conf().setAppName("Image Classification Example"))
+    sc = init_nncontext(create_spark_conf().setAppName("Image Classification Example"))
 
     predict(options.model_path, options.img_path, options.topN)

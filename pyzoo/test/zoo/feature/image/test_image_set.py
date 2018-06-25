@@ -15,12 +15,10 @@
 #
 
 import pytest
-import os
-from bigdl.util.common import *
-from bigdl.transform.vision.image import MatToTensor
+import cv2
 
 from zoo.common.nncontext import *
-from zoo.feature.image.imageset import *
+from zoo.feature.image import *
 
 
 class Test_Image_Set():
@@ -29,8 +27,8 @@ class Test_Image_Set():
         """ setup any state tied to the execution of the given method in a
         class.  setup_method is invoked for every test method of a class.
         """
-        self.sc = get_nncontext(create_spark_conf().setMaster("local[4]")
-                                .setAppName("test image set"))
+        self.sc = init_nncontext(create_spark_conf().setMaster("local[4]")
+                                 .setAppName("test image set"))
         resource_path = os.path.join(os.path.split(__file__)[0], "../../resources")
         self.image_path = os.path.join(resource_path, "pascal/000025.jpg")
 
@@ -51,7 +49,7 @@ class Test_Image_Set():
         images.count()
 
     def test_get_image(self):
-        image_set = ImageSet.read(self.image_path)
+        image_set = ImageSet.read(self.image_path, resize_height=128, resize_width=128)
         image_set.get_image()
 
     def test_get_label(self):
@@ -71,7 +69,7 @@ class Test_Image_Set():
         assert image_set.is_distributed() is True
 
     def test_image_set_transform(self):
-        transformer = MatToTensor()
+        transformer = ImageMatToTensor()
         image_set = ImageSet.read(self.image_path)
         transformed = image_set.transform(transformer)
         transformed.get_image()
@@ -84,6 +82,10 @@ class Test_Image_Set():
         image_set = ImageSet.read(self.image_path, self.sc)
         image_set.get_predict()
 
+    def test_local_image_set(self):
+        image = cv2.imread(self.image_path)
+        local_image_set = LocalImageSet([image])
+        print(local_image_set.get_image())
 
 if __name__ == "__main__":
     pytest.main([__file__])

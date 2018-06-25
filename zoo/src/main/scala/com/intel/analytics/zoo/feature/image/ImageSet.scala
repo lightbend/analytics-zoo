@@ -16,9 +16,10 @@
 
 package com.intel.analytics.zoo.feature.image
 
-import com.intel.analytics.bigdl.transform.vision.image._
+import com.intel.analytics.bigdl.transform.vision.image.{DistributedImageFrame,
+       ImageFeature, ImageFrame, LocalImageFrame}
 import com.intel.analytics.zoo.common.Utils
-
+import com.intel.analytics.zoo.feature.common.Preprocessing
 import org.apache.commons.io.FileUtils
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -32,11 +33,11 @@ abstract class ImageSet {
    * @param transformer FeatureTransformer
    * @return transformed ImageSet
    */
-  def transform(transformer: FeatureTransformer): ImageSet
+  def transform(transformer: Preprocessing[ImageFeature, ImageFeature]): ImageSet
 
   // scalastyle:off methodName
   // scalastyle:off noSpaceBeforeLeftBracket
-  def -> (transformer: FeatureTransformer): ImageSet = {
+  def -> (transformer: Preprocessing[ImageFeature, ImageFeature]): ImageSet = {
     this.transform(transformer)
   }
 
@@ -70,8 +71,8 @@ abstract class ImageSet {
 }
 
 class LocalImageSet(var array: Array[ImageFeature]) extends ImageSet {
-  override def transform(transformer: FeatureTransformer): ImageSet = {
-    array = array.map(transformer.transform)
+  override def transform(transformer: Preprocessing[ImageFeature, ImageFeature]): ImageSet = {
+    array = transformer.apply(array.toIterator).toArray
     this
   }
 
@@ -85,7 +86,7 @@ class LocalImageSet(var array: Array[ImageFeature]) extends ImageSet {
 }
 
 class DistributedImageSet(var rdd: RDD[ImageFeature]) extends ImageSet {
-  override def transform(transformer: FeatureTransformer): ImageSet = {
+  override def transform(transformer: Preprocessing[ImageFeature, ImageFeature]): ImageSet = {
     rdd = transformer(rdd)
     this
   }
@@ -127,20 +128,28 @@ object ImageSet {
    * if sc is null, path is local directory/image file/image file with wildcard character
    * @param sc SparkContext
    * @param minPartitions A suggestion value of the minimal splitting number for input data.
+   * @param resizeH height after resize, by default is -1 which will not resize the image
+   * @param resizeW width after resize, by default is -1 which will not resize the image
    * @return ImageSet
    */
-  def read(path: String, sc: SparkContext = null, minPartitions: Int = 1): ImageSet = {
-    if (null != sc) {
+  def read(path: String, sc: SparkContext = null, minPartitions: Int = 1,
+           resizeH: Int = -1, resizeW: Int = -1): ImageSet = {
+    val imageSet = if (null != sc) {
       val images = sc.binaryFiles(path, minPartitions).map { case (p, stream) =>
-        ImageFeature(stream.toArray(), uri = p)
+          ImageFeature(stream.toArray(), uri = p)
       }
-      ImageSet.rdd(images) -> BytesToMat()
+      ImageSet.rdd(images)
     } else {
       val files = Utils.listLocalFiles(path)
       val images = files.map { p =>
         ImageFeature(FileUtils.readFileToByteArray(p), uri = p.getAbsolutePath)
       }
-      ImageSet.array(images) -> BytesToMat()
+      ImageSet.array(images)
+    }
+    if (resizeW == -1 && resizeH == -1) {
+      imageSet -> ImageBytesToMat()
+    } else {
+      imageSet -> BufferedImageResize(resizeH, resizeW) -> ImageBytesToMat()
     }
   }
 

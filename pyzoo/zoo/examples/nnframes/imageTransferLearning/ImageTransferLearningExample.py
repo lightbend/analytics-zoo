@@ -15,21 +15,18 @@
 #
 
 import re
-from bigdl.util.common import *
-from pyspark.sql.functions import col, udf
-from pyspark.sql.types import DoubleType, StringType
-from bigdl.nn.layer import *
+
 from bigdl.nn.criterion import *
+from bigdl.nn.layer import *
 from pyspark import SparkConf
 from pyspark.ml import Pipeline
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+from pyspark.sql.functions import col, udf
+from pyspark.sql.types import DoubleType, StringType
 
 from zoo.common.nncontext import *
-from zoo.pipeline.nnframes.nn_classifier import *
-from zoo.pipeline.nnframes.nn_image_reader import *
-from zoo.feature.common import *
-from zoo.feature.image.imagePreprocessing import *
-
+from zoo.feature.image import *
+from zoo.pipeline.nnframes import *
 
 if __name__ == "__main__":
 
@@ -39,7 +36,7 @@ if __name__ == "__main__":
         exit(-1)
 
     sparkConf = SparkConf().setAppName("ImageTransferLearningExample")
-    sc = get_nncontext(sparkConf)
+    sc = init_nncontext(sparkConf)
 
     model_path = sys.argv[1]
     image_path = sys.argv[2] + '/*/*'
@@ -55,10 +52,10 @@ if __name__ == "__main__":
 
     # compose a pipeline that includes feature transform, pretrained model and Logistic Regression
     transformer = ChainedPreprocessing(
-        [RowToImageFeature(), Resize(256, 256), CenterCrop(224, 224),
-         ChannelNormalize(123.0, 117.0, 104.0), MatToTensor(), ImageFeatureToTensor()])
+        [RowToImageFeature(), ImageResize(256, 256), ImageCenterCrop(224, 224),
+         ImageChannelNormalize(123.0, 117.0, 104.0), ImageMatToTensor(), ImageFeatureToTensor()])
 
-    preTrainedNNModel = NNModel.create(Model.loadModel(model_path), transformer) \
+    preTrainedNNModel = NNModel(Model.loadModel(model_path), transformer) \
         .setFeaturesCol("image") \
         .setPredictionCol("embedding")
 

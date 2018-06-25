@@ -43,14 +43,14 @@ class NeuralCF(Recommender):
                  item_embed=20, hidden_layers=(40, 20, 10), include_mf=True,
                  mf_embed=20, bigdl_type="float"):
         super(NeuralCF, self).__init__(None, bigdl_type,
-                                       user_count,
-                                       item_count,
-                                       class_num,
-                                       user_embed,
-                                       item_embed,
-                                       hidden_layers,
+                                       int(user_count),
+                                       int(item_count),
+                                       int(class_num),
+                                       int(user_embed),
+                                       int(item_embed),
+                                       [int(unit) for unit in hidden_layers],
                                        include_mf,
-                                       mf_embed)
+                                       int(mf_embed))
 
     @staticmethod
     def load_model(path, weight_path=None, bigdl_type="float"):
@@ -58,7 +58,8 @@ class NeuralCF(Recommender):
         Load an existing NeuralCF model (with weights).
 
         # Arguments
-        path: The path to save the model. Local file system, HDFS and Amazon S3 are supported.
+        path: The path for the pre-defined model.
+              Local file system, HDFS and Amazon S3 are supported.
               HDFS path should be like 'hdfs://[host]:[port]/xxx'.
               Amazon S3 path should be like 's3a://bucket/xxx'.
         weight_path: The path for pre-trained weights if any. Default is None.

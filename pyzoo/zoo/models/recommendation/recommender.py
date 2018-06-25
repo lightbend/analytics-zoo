@@ -29,12 +29,12 @@ if sys.version >= '3':
 
 class UserItemFeature(object):
     """
-    Represent records of user-item features.
+    Represent records of user-item with features.
 
     Each record should contain the following fields:
     user_id: Positive int.
     item_id: Positive int.
-    sample: Sample with consists of feature(s) and label(s).
+    sample: Sample which consists of feature(s) and label(s).
     """
     def __init__(self, user_id, item_id, sample, bigdl_type="float"):
         self.user_id = int(user_id)
@@ -52,12 +52,12 @@ class UserItemFeature(object):
 
 class UserItemPrediction(object):
     """
-    Represent prediction results of user-item pairs.
+    Represent the prediction results of user-item pairs.
 
     Each prediction record will contain the following information:
     user_id: Positive int.
     item_id: Positive int.
-    prediction: The rating that the user will give for the item.
+    prediction: The prediction (rating) for the user on the item.
     probability: The probability for the prediction.
     """
     def __init__(self, user_id, item_id, prediction, probability, bigdl_type="float"):
@@ -104,7 +104,7 @@ class Recommender(ZooModel):
         result_rdd = callBigDlFunc(self.bigdl_type, "recommendForUser",
                                    self.value,
                                    self._to_tuple_rdd(feature_rdd),
-                                   max_items)
+                                   int(max_items))
         return self._to_prediction_rdd(result_rdd)
 
     def recommend_for_item(self, feature_rdd, max_users):
@@ -119,7 +119,7 @@ class Recommender(ZooModel):
         result_rdd = callBigDlFunc(self.bigdl_type, "recommendForItem",
                                    self.value,
                                    self._to_tuple_rdd(feature_rdd),
-                                   max_users)
+                                   int(max_users))
         return self._to_prediction_rdd(result_rdd)
 
     @staticmethod

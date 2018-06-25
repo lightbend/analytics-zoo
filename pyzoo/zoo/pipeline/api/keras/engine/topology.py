@@ -14,27 +14,13 @@
 # limitations under the License.
 #
 
-from bigdl.nn.keras.layer import KerasLayer
-from bigdl.nn.layer import Node
-
+import zoo.pipeline.api.autograd as autograd
+from zoo.pipeline.api.keras.base import ZooKerasLayer
 from zoo.pipeline.api.keras.utils import *
 
 if sys.version >= '3':
     long = int
     unicode = str
-
-
-class ZooKerasCreator(JavaValue):
-    def jvm_class_constructor(self):
-        name = "createZooKeras" + self.__class__.__name__
-        print("creating: " + name)
-        return name
-
-
-class ZooKerasLayer(ZooKerasCreator, KerasLayer):
-    @classmethod
-    def of(cls, jvalue, bigdl_type="float"):
-        return KerasLayer(jvalue, bigdl_type)
 
 
 class KerasNet(ZooKerasLayer):
@@ -96,6 +82,40 @@ class KerasNet(ZooKerasLayer):
                       self.value,
                       path,
                       over_write)
+
+    def clear_gradient_clipping(self):
+        """
+        Clear gradient clipping parameters. In this case, gradient clipping will not be applied.
+        In order to take effect, it needs to be called before fit.
+        """
+        callBigDlFunc(self.bigdl_type, "zooClearGradientClipping",
+                      self.value)
+
+    def set_constant_gradient_clipping(self, min, max):
+        """
+        Set constant gradient clipping during the training process.
+        In order to take effect, it needs to be called before fit.
+
+        # Arguments
+        min: The minimum value to clip by. Float.
+        max: The maximum value to clip by. Float.
+        """
+        callBigDlFunc(self.bigdl_type, "zooSetConstantGradientClipping",
+                      self.value,
+                      float(min),
+                      float(max))
+
+    def set_gradient_clipping_by_l2_norm(self, clip_norm):
+        """
+        Clip gradient to a maximum L2-Norm during the training process.
+        In order to take effect, it needs to be called before fit.
+
+        # Arguments
+        clip_norm: Gradient L2-Norm threshold. Float.
+        """
+        callBigDlFunc(self.bigdl_type, "zooSetGradientClippingByL2Norm",
+                      self.value,
+                      float(clip_norm))
 
     def fit(self, x, y=None, batch_size=32, nb_epoch=10, validation_data=None, distributed=True):
         """
@@ -170,7 +190,7 @@ class KerasNet(ZooKerasLayer):
         distributed: Boolean. Whether to do prediction in distributed mode or local mode.
                      Default is True. In local mode, x must be a Numpy array.
         """
-        if is_distributed:
+        if distributed:
             if isinstance(x, np.ndarray):
                 features = to_sample_rdd(x, np.zeros([x.shape[0]]))
             elif isinstance(x, RDD):
@@ -184,8 +204,53 @@ class KerasNet(ZooKerasLayer):
             else:
                 raise TypeError("Unsupported prediction data type: %s" % type(x))
 
+    def summary(self, line_length=120, positions=[.33, .55, .67, 1.]):
+        """
+        Print out the summary information of an Analytics Zoo Keras Model.
 
-class Input(ZooKerasCreator, Node):
+        For each layer in the model, there will be a separate row containing four columns:
+        ________________________________________________________________________________
+        Layer (type)          Output Shape          Param #     Connected to
+        ================================================================================
+
+        In addition, total number of parameters of this model, separated into trainable and
+        non-trainable counts, will be printed out after the table.
+
+        # Arguments
+        line_length The total length of one row. Default is 120.
+        positions: The maximum absolute length proportion(%) of each field.
+                   List of Float of length 4.
+                   Usually you don't need to adjust this parameter.
+                   Default is [.33, .55, .67, 1.], meaning that
+                   the first field will occupy up to 33% of line_length,
+                   the second field will occupy up to (55-33)% of line_length,
+                   the third field will occupy up to (67-55)% of line_length,
+                   the fourth field will occupy the remaining line (100-67)%.
+                   If the field has a larger length, the remaining part will be trimmed.
+                   If the field has a smaller length, the remaining part will be white spaces.
+        """
+        callBigDlFunc(self.bigdl_type, "zooKerasNetSummary",
+                      self.value,
+                      line_length,
+                      [float(p) for p in positions])
+
+    def to_model(self):
+        from zoo.pipeline.api.keras.models import Model
+        return Model.from_jvalue(callBigDlFunc(self.bigdl_type, "kerasNetToModel", self.value))
+
+    @property
+    def layers(self):
+        jlayers = callBigDlFunc(self.bigdl_type, "getSubModules", self)
+        layers = [Layer.of(jlayer) for jlayer in jlayers]
+        return layers
+
+    def flattened_layers(self, include_container=False):
+        jlayers = callBigDlFunc(self.bigdl_type, "getFlattenSubModules", self, include_container)
+        layers = [Layer.of(jlayer) for jlayer in jlayers]
+        return layers
+
+
+class Input(autograd.Variable):
     """
     Used to instantiate an input node.
 
@@ -198,9 +263,8 @@ class Input(ZooKerasCreator, Node):
     creating: createZooKerasInput
     """
     def __init__(self, shape=None, name=None, bigdl_type="float"):
-        super(Input, self).__init__(None, bigdl_type,
-                                    name,
-                                    list(shape) if shape else None)
+        super(Input, self).__init__(input_shape=list(shape) if shape else None,
+                                    node=None, jvalue=None, name=name)
 
 
 class InputLayer(ZooKerasLayer):

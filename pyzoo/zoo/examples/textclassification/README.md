@@ -18,10 +18,10 @@ Executing this example will automatically download and extract the data for you 
 
 You can also choose to prepare the data by yourself beforehand. The following scripts we prepare will serve to download and extract the data:
 ```bash
-bash ${ZOO_HOME}/data/news20/get_news20.sh dir
-bash ${ZOO_HOME}/data/glove/get_glove.sh dir
+bash ${ANALYTICS_ZOO_HOME}/bin/data/news20/get_news20.sh dir
+bash ${ANALYTICS_ZOO_HOME}/bin/data/glove/get_glove.sh dir
 ```
-where `ZOO_HOME` is the root directory of the Zoo project and `dir` is the directory you wish to locate the downloaded data. If `dir` is not specified, the data will be downloaded to the current working directory. 20 Newsgroup dataset and GloVe word embeddings are supposed to be placed under the same directory.
+where `ANALYTICS_ZOO_HOME` is the `dist` directory under the Analytics Zoo project and `dir` is the directory you wish to locate the downloaded data. If `dir` is not specified, the data will be downloaded to the current working directory. 20 Newsgroup dataset and GloVe word embeddings are supposed to be placed under the same directory.
 
 The data folder structure after extraction should look like the following:
 ```
@@ -37,26 +37,29 @@ Run the following command for Spark local mode (`MASTER=local[*]`) or cluster mo
 
 ```bash
 SPARK_HOME=the root directory of Spark
-ZOO_HOME=the root directory of the Zoo project
 MASTER=...
-PYTHON_API_ZIP_PATH=${ZOO_HOME}/dist/lib/zoo-VERSION-python-api.zip
-ZOO_JAR_PATH=${ZOO_HOME}/dist/lib/zoo-VERSION-jar-with-dependencies.jar
-PYTHONPATH=${PYTHON_API_ZIP_PATH}:$PYTHONPATH
+ANALYTICS_ZOO_ROOT=the root directory of the Analytics Zoo project
+ANALYTICS_ZOO_HOME=$ANALYTICS_ZOO_ROOT/dist
+ANALYTICS_ZOO_PY_ZIP=${ANALYTICS_ZOO_HOME}/lib/analytics-zoo-VERSION-python-api.zip
+ANALYTICS_ZOO_JAR=${ANALYTICS_ZOO_HOME}/lib/analytics-zoo-VERSION-jar-with-dependencies.jar
+ANALYTICS_ZOO_CONF=${ANALYTICS_ZOO_HOME}/conf/spark-analytics-zoo.conf
+PYTHONPATH=${ANALYTICS_ZOO_PY_ZIP}:$PYTHONPATH
 
 ${SPARK_HOME}/bin/spark-submit \
     --master ${MASTER} \
     --driver-memory 20g \
     --executor-memory 20g \
-    --py-files ${PYTHON_API_ZIP_PATH},${ZOO_HOME}/pyzoo/zoo/examples/textclassification/text_classification.py \
-    --jars ${ZOO_JAR_PATH} \
-    --conf spark.driver.extraClassPath=${ZOO_JAR_PATH} \
-    --conf spark.executor.extraClassPath=${ZOO_JAR_PATH} \
-    ${ZOO_HOME}/pyzoo/zoo/examples/textclassification/text_classification.py \
+    --properties-file ${ANALYTICS_ZOO_CONF} \
+    --py-files ${ANALYTICS_ZOO_PY_ZIP},${ANALYTICS_ZOO_ROOT}/pyzoo/zoo/examples/textclassification/text_classification.py \
+    --jars ${ANALYTICS_ZOO_JAR} \
+    --conf spark.driver.extraClassPath=${ANALYTICS_ZOO_JAR} \
+    --conf spark.executor.extraClassPath=${ANALYTICS_ZOO_JAR} \
+    ${ANALYTICS_ZOO_ROOT}/pyzoo/zoo/examples/textclassification/text_classification.py \
     --data_path /tmp/text_data
 ```
 __Options:__
 * `--data_path` The path where the training and word2Vec data locate. Default is `/tmp/text_data`. Make sure that you have write permission to the specified path if you want the program to automatically download the data for you.
-* `--partition_num` The number of partitions to cut the dataset into. Datault is 4.
+* `--partition_num` The number of partitions to cut the dataset into. Default is 4.
 * `--token_length` The size of each word vector. Default is 200.
 * `--sequence_length` The length of a sequence. Default is 500.
 * `--max_words_num` The maximum number of words. Default is 5000.

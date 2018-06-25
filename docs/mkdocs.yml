@@ -1,4 +1,4 @@
-site_name: Analytics-Zoo Project
+site_name: Analytics Zoo
 theme: null
 extra_css: [extra.css]
 theme_dir: mkdocs_windmill 
@@ -9,30 +9,50 @@ extra:
     article_nav_top: false
     article_nav_bottom: false
 
-
 pages:
-- Overview: 
-  - What is Zoo and Why: index.md 
-  - Getting Help: gettinghelp.md
+- Overview: index.md 
 - Releases: 
   - Download: release-download.md 
   - Documentation: release-docs.md
-- Getting Started: getting-started.md
-- Scala User Guide: 
-  - Examples: ScalaUserGuide/examples.md
-  - Model API: ScalaUserGuide/modelapi.md
-  - Pipeline API:
-    - Keras-Style: ScalaUserGuide/PipelineAPI/keras-style.md
-    - NNFrames: ScalaUserGuide/PipelineAPI/nnframes.md
-- Python User Guide: 
-  - Examples: PythonUserGuide/python-examples.md
-  - Model API: PythonUserGuide/model-api.md
-  - Pipeline API:
-    - Keras: PythonUserGuide/PipelineAPI/keras.md
-    - NNFrames: PythonUserGuide/PipelineAPI/nnframes.md
-- Programming Guide: programming-guide.md
-- Notebooks: 
-  - Scala: Notebooks/scala.md
-  - Python: Notebooks/python.md
+- User Guide:
+  - Python:
+    - Install: PythonUserGuide/install.md
+    - Run: PythonUserGuide/run.md
+    - Examples: PythonUserGuide/examples.md
+    - FAQ: PythonUserGuide/python-faq.md
+  - Scala: 
+    - Install: ScalaUserGuide/install.md
+    - Run: ScalaUserGuide/run.md
+    - Examples: ScalaUserGuide/examples.md
+- Programming Guide: 
+  - Pipeline APIs:
+    - DataFrame and ML Pipeline: ProgrammingGuide/nnframes.md
+    - Autograd: ProgrammingGuide/autograd.md
+    - Transfer Learning: ProgrammingGuide/transferlearning.md
+  - Feature Engineering:
+    - Working with Images: ProgrammingGuide/workingwithimages.md
+  - Built-in Models:
+    - Object Detection API: ProgrammingGuide/object-detection.md
+    - Image Classification API: ProgrammingGuide/image-classification.md
+    - Text Classification API: ProgrammingGuide/text-classification.md
+    - Recommendation API: ProgrammingGuide/recommendation.md
+  - Reference Use Cases:
+    - Use Cases: ProgrammingGuide/usercases-overview.md
+    - Anomaly Detection: ProgrammingGuide/anomaly-detection.md
+- API Guide:
+  - Pipeline APIs:
+    - NNFrames: APIGuide/PipelineAPI/nnframes.md
+    - Autograd:
+      - Math: APIGuide/PipelineAPI/math.md
+      - Variable: APIGuide/PipelineAPI/variable.md
+    - Net: APIGuide/PipelineAPI/net.md
+  - Feature Engineering:
+    - Image: APIGuide/FeatureEngineering/image.md
+    - Preprocessing: APIGuide/FeatureEngineering/preprocessing.md
+  - Models:
+    - Object Detection: APIGuide/Models/object-detection.md
+    - Image Classification: APIGuide/Models/image-classification.md
+    - Text Classification: APIGuide/Models/text-classification.md
+    - Recommendation: APIGuide/Models/recommendation.md
 - Powered by: powered-by.md
 - FAQ and Known Issues: known-issues.md

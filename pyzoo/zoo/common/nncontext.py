@@ -18,10 +18,10 @@ from bigdl.util.common import *
 import warnings
 
 
-def get_nncontext(conf=None):
+def init_nncontext(conf=None):
     """
-    Gets a SparkContext with optimized configuration for BigDL performance. The method
-    will also initialize the BigDL engine.
+    Creates or gets a SparkContext with optimized configuration for BigDL performance.
+    The method will also initialize the BigDL engine.
 
     Note: if you use spark-shell or Jupyter notebook, as the Spark context is created
     before your code, you have to set Spark conf values through command line options
@@ -29,18 +29,36 @@ def get_nncontext(conf=None):
 
     :param conf: User defined Spark conf
     """
-
-    sc = get_spark_context(conf)
+    if isinstance(conf, six.string_types):
+        sc = getOrCreateSparkContext(conf=None, appName=conf)
+    else:
+        sc = getOrCreateSparkContext(conf=conf)
     redire_spark_logs()
     show_bigdl_info_logs()
     init_engine()
     return sc
 
 
+def getOrCreateSparkContext(conf=None, appName=None):
+    """
+    Get the current active spark context and create one if no active instance
+    :param conf: combining bigdl configs into spark conf
+    :return: SparkContext
+    """
+    with SparkContext._lock:
+        if SparkContext._active_spark_context is None:
+            spark_conf = create_spark_conf() if conf is None else conf
+            if appName:
+                spark_conf.setAppName(appName)
+            return SparkContext.getOrCreate(spark_conf)
+        else:
+            return SparkContext.getOrCreate()
+
+
 def check_version():
     sc = get_spark_context()
     conf = sc._conf
-    if conf.get("spark.analytics.zoo.versionCheck", "True").lower() == "true":
+    if conf.get("spark.analytics.zoo.versionCheck", "False").lower() == "true":
         report_warn = conf.get(
             "spark.analytics.zoo.versionCheck.warning", "False").lower() == "true"
         _check_spark_version(sc, report_warn)

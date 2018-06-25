@@ -21,8 +21,7 @@ from bigdl.util.common import *
 from pyspark.sql.types import *
 
 from zoo.common.nncontext import *
-from zoo.pipeline.nnframes.nn_image_reader import *
-from zoo.pipeline.nnframes.nn_image_schema import *
+from zoo.pipeline.nnframes import *
 
 
 class TestNNImageReader():
@@ -33,7 +32,7 @@ class TestNNImageReader():
         class. setup_method is invoked for every test method of a class.
         """
         sparkConf = create_spark_conf().setMaster("local[1]").setAppName("TestNNImageReader")
-        self.sc = get_nncontext(sparkConf)
+        self.sc = init_nncontext(sparkConf)
         self.resource_path = os.path.join(os.path.split(__file__)[0], "../../resources")
 
     def teardown_method(self, method):
