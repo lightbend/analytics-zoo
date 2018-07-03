@@ -5,6 +5,7 @@ RUN apt-get install -y python-tk
 
 # generated Python script from Jupyter Notebook
 ADD ./dnn_anomaly_bigdl.py /opt/work
+ADD ./wait-and-start-training.sh /opt/work/analytics-zoo/scripts
 
 # data folder : to be mapped as volume during run
 RUN mkdir data

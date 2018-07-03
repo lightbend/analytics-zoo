@@ -5,6 +5,7 @@
 
 
 from __future__ import division
+
 import math
 import pandas as pd
 import datetime as dt
@@ -44,12 +45,29 @@ sc = SparkContext.getOrCreate(conf=create_spark_conf().setMaster("local[4]").set
 init_engine()
 
 
+# In[ ]:
+
+
+import os
+      
+data_file_path = os.getenv("DATA_FILE_NAME")
+generation_complete_file_path = os.getenv("GENERATION_COMPLETE_FILE_NAME")
+model_pb_file_path = os.getenv("MODEL_PB_FILE_NAME")
+model_attrib_file_path = os.getenv("MODEL_ATTRIB_FILE_NAME")
+
+print(data_file_path)
+print(generation_complete_file_path)
+print(model_pb_file_path)
+print(model_attrib_file_path)
+
+
 # ## Read data from csv
 
 # In[3]:
 
 
-df = pd.read_csv("data/CPU_examples.csv")
+# df = pd.read_csv("data/CPU_examples.csv")
+df = pd.read_csv(data_file_path)
 
 
 # In[4]:
@@ -318,16 +336,16 @@ print("saving logs to ", app_name)
 # In[24]:
 
 
+# get_ipython().run_cell_magic('time', '', '# Boot training process\ntrained_model = optimizer.optimize()\nprint("Optimization Done.")')
 trained_model = optimizer.optimize()
 print("Optimization Done.")
-
-# get_ipython().run_cell_magic('time', '', '# Boot training process\ntrained_model = optimizer.optimize()\nprint("Optimization Done.")')
 
 
 # In[25]:
 
 
-model.save_tensorflow([("input", [1, 3])], "/tmp/model.pb")
+# model.save_tensorflow([("input", [1, 3])], "/tmp/model.pb")
+model.save_tensorflow([("input", [1, 3])], model_pb_file_path)
 
 loss = np.array(train_summary.read_scalar("Loss"))
 top1 = np.array(val_summary.read_scalar("Top1Accuracy"))
@@ -364,13 +382,14 @@ predictions = trained_model.predict(test_data)
 
 # In[28]:
 
+
+# get_ipython().run_cell_magic('time', '', "predictions = trained_model.predict(test_data)\nprint('Ground Truth labels:')\nprint(', '.join(str(map_groundtruth_label(s.label.to_ndarray())) for s in test_data.take(50)))\nprint('Predicted labels:')\nprint(', '.join(str(map_predict_label(s)) for s in predictions.take(50)))")
+
 predictions = trained_model.predict(test_data)
 print('Ground Truth labels:')
 print(', '.join(str(map_groundtruth_label(s.label.to_ndarray())) for s in test_data.take(50)))
 print('Predicted labels:')
 print(', '.join(str(map_predict_label(s)) for s in predictions.take(50)))
-
-# get_ipython().run_cell_magic('time', '', "predictions = trained_model.predict(test_data)\nprint('Ground Truth labels:')\nprint(', '.join(str(map_groundtruth_label(s.label.to_ndarray())) for s in test_data.take(50)))\nprint('Predicted labels:')\nprint(', '.join(str(map_predict_label(s)) for s in predictions.take(50)))")
 
 
 # In[29]:
@@ -393,64 +412,26 @@ print(mismatch_size)
 print(accuracy)
 
 
-# ## Predict on a new dataset
-
 # In[31]:
 
 
-df = pd.read_csv("data/CPU_examples_test.csv")
+import datetime
+now = datetime.datetime.now()
 
-## standardize and widen
-df['CPU'] = df['CPU'].apply(lambda x: (x - scaler_mean) / scaler_var)
-X_test = widenX(lookback, df['CPU'])
-Y_test = widenY(lookback, df['Class'])
-
-print(X_test.shape)
-anomaly = df[df.Class == 1]
-anomaly.shape
-
-
-# In[32]:
+# with open("/tmp/model-attrib.properties", "w") as fp:
+with open(model_attrib_file_path, "w") as fp:
+    fp.write("width=" + str(lookback) + "\n")
+    fp.write("mean=" + str(scaler_mean[0]) + "\n")
+    fp.write("std=" + str(scaler_var[0]) + "\n")
+    fp.write("input=input\n")
+    fp.write("output=output\n")
+    fp.write("generatedAt=" + str(datetime.datetime.now()) + "\n")
 
 
-def get_rdd_from_ndarray_test(sc):
-    rdd_X_test = sc.parallelize(X_test)
-    rdd_Y_test = sc.parallelize(Y_test)
-
-    rdd_test_sample = rdd_X_test.zip(rdd_Y_test).map(lambda labeledFeatures:
-                                     common.Sample.from_ndarray(labeledFeatures[0], labeledFeatures[1]+1))
-    return rdd_test_sample
-
-test_data = get_rdd_from_ndarray_test(sc)
+# In[ ]:
 
 
-# In[33]:
+with open(generation_complete_file_path, "w") as fp:
+    fp.write(str(datetime.datetime.now()))
 
-predictions = trained_model.predict(test_data)
-print('Ground Truth labels:')
-print(', '.join(str(map_groundtruth_label(s.label.to_ndarray())) for s in test_data.take(50)))
-print('Predicted labels:')
-print(', '.join(str(map_predict_label(s)) for s in predictions.take(50)))
-
-# get_ipython().run_cell_magic('time', '', "predictions = trained_model.predict(test_data)\nprint('Ground Truth labels:')\nprint(', '.join(str(map_groundtruth_label(s.label.to_ndarray())) for s in test_data.take(50)))\nprint('Predicted labels:')\nprint(', '.join(str(map_predict_label(s)) for s in predictions.take(50)))")
-
-
-# In[34]:
-
-
-labels = [map_groundtruth_label(s.label.to_ndarray()) for s in test_data.take(X_test.shape[0])]
-df_prediction = pd.DataFrame({'Real Class' :np.array(labels)})
-predicted_labels = [map_predict_label(s) for s in predictions.take(X_test.shape[0])]
-df_prediction['Prediction'] = predicted_labels
-
-
-# In[35]:
-
-
-total_size = X_test.shape[0]
-mismatch_size = df_prediction[ df_prediction['Real Class'] != df_prediction['Prediction'] ].size
-accuracy = ((total_size - mismatch_size) / total_size) * 100
-print(total_size)
-print(mismatch_size)
-print(accuracy)
 
