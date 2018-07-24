@@ -25,8 +25,8 @@ from numpy import arange, sin, pi, random
 from pyspark import SparkContext
 
 # get_ipython().run_line_magic('matplotlib', 'inline')
-sns.set(style='whitegrid', palette='muted', font_scale=1.5)
-rcParams['figure.figsize'] = 14, 8
+# sns.set(style='whitegrid', palette='muted', font_scale=1.5)
+# rcParams['figure.figsize'] = 14, 8
 RANDOM_SEED = 42
 LABELS = ["Normal", "Anomaly"]
 lookback = 3
@@ -45,15 +45,32 @@ sc = SparkContext.getOrCreate(conf=create_spark_conf().setMaster("local[4]").set
 init_engine()
 
 
-# In[ ]:
+# In[3]:
 
 
 import os
-      
+
+## for running on cluster
 data_file_path = os.getenv("DATA_FILE_NAME")
 generation_complete_file_path = os.getenv("GENERATION_COMPLETE_FILE_NAME")
 model_pb_file_path = os.getenv("MODEL_PB_FILE_NAME")
 model_attrib_file_path = os.getenv("MODEL_ATTRIB_FILE_NAME")
+
+## for local runs possibly these will not be set in the environment
+if not data_file_path:
+    data_file_path = 'data/CPU_examples.csv'
+
+if not generation_complete_file_path:
+    generation_complete_file_path = '/tmp/data_preparation_complete.txt'
+    
+if not model_pb_file_path:
+    model_pb_file_path = '/tmp/model.pb'
+    
+if not model_attrib_file_path:
+    model_attrib_file_path = '/tmp/model-attributes.properties'
+
+local_model_file_path = '/tmp/model.bigdl'
+local_model_weights_file_path = '/tmp/model.bin'
 
 print(data_file_path)
 print(generation_complete_file_path)
@@ -63,20 +80,19 @@ print(model_attrib_file_path)
 
 # ## Read data from csv
 
-# In[3]:
+# In[4]:
 
 
-# df = pd.read_csv("data/CPU_examples.csv")
 df = pd.read_csv(data_file_path)
 
 
-# In[4]:
+# In[5]:
 
 
 df.shape
 
 
-# In[5]:
+# In[6]:
 
 
 df.head()
@@ -84,7 +100,7 @@ df.head()
 
 # ## Basic sanity check of data and normalization
 
-# In[6]:
+# In[7]:
 
 
 # check for null data
@@ -103,7 +119,7 @@ print(scaler_var)   ## std dev
 df.head()
 
 
-# In[7]:
+# In[8]:
 
 
 # let's explore the distribution of input data
@@ -116,7 +132,7 @@ print(count_classes.count)
 # plt.ylabel("Frequency");
 
 
-# In[8]:
+# In[9]:
 
 
 # Just checking the relative counts
@@ -126,19 +142,19 @@ normal = df[df.Class == 0]
 anomaly.shape
 
 
-# In[9]:
+# In[10]:
 
 
 normal.shape
 
 
-# In[10]:
+# In[11]:
 
 
 anomaly.CPU.describe()
 
 
-# In[11]:
+# In[12]:
 
 
 normal.CPU.describe()
@@ -146,7 +162,7 @@ normal.CPU.describe()
 
 # ## Any correlation between time and CPU metrics ?
 
-# In[12]:
+# In[13]:
 
 
 # f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
@@ -165,7 +181,7 @@ normal.CPU.describe()
 
 # ## Feature Re-engineering
 
-# In[13]:
+# In[14]:
 
 
 def widenX(width, x) :
@@ -185,7 +201,7 @@ def widenY(width, y):
     return y[width-1:]
 
 
-# In[14]:
+# In[15]:
 
 
 df.head()
@@ -193,21 +209,21 @@ anomaly = df[df.Class == 1]
 anomaly.shape
 
 
-# In[15]:
+# In[16]:
 
 
 X_train = widenX(lookback, df['CPU'])
 X_train.shape
 
 
-# In[16]:
+# In[17]:
 
 
 Y_train = widenY(lookback, df['Class'])
 Y_train.shape
 
 
-# In[17]:
+# In[18]:
 
 
 class_0 = list(filter(lambda x: x == 0.0, Y_train)) 
@@ -217,7 +233,7 @@ print(len(class_0), len(class_1))
 
 # ## Split into training and test set
 
-# In[18]:
+# In[19]:
 
 
 original_X_train_size = X_train.shape[0]
@@ -236,13 +252,13 @@ print(X_train.shape)
 print(X_test.shape)
 
 
-# In[19]:
+# In[20]:
 
 
 X_train.shape
 
 
-# In[20]:
+# In[21]:
 
 
 X_test.shape
@@ -250,7 +266,7 @@ X_test.shape
 
 # In order to get data into BigDL engine we need to convert the numpy arrays into Spark RDD. Here's a helper function that does this. Note that we will use negative log likelihood for loss computation - hence based on the documentation of BigDL, the labels need to start from 1. Hence we add a 1 in the function below to all the labels.
 
-# In[21]:
+# In[22]:
 
 
 def get_rdd_from_ndarray(sc):
@@ -270,36 +286,46 @@ def get_rdd_from_ndarray(sc):
 
 # # Build the Model
 
-# In[22]:
+# In[23]:
 
 
 # create a graph model
+def make_new_model(X_train):
 
-## input layer with relu and dropout
-initial = Linear(X_train.shape[1], 16).set_name("input")()
-relu1 = ReLU()(initial)
-dropout1 = Dropout(0.3)(relu1)
+    ## input layer with relu and dropout
+    initial = Linear(X_train.shape[1], 16).set_name("input")()
+    relu1 = ReLU()(initial)
+    dropout1 = Dropout(0.3)(relu1)
 
-## first hidden layer with relu and dropout
-hidden1 = Linear(16, 32)(dropout1)
-relu2 = ReLU()(hidden1)
-dropout2 = Dropout(0.4)(relu2)
+    ## first hidden layer with relu and dropout
+    hidden1 = Linear(16, 32)(dropout1)
+    relu2 = ReLU()(hidden1)
+    dropout2 = Dropout(0.4)(relu2)
 
-## second hidden layer with relu and dropout
-hidden2 = Linear(32, 32)(dropout2)
-relu3 = ReLU()(hidden2)
-dropout3 = Dropout(0.4)(relu3)
+    ## second hidden layer with relu and dropout
+    hidden2 = Linear(32, 32)(dropout2)
+    relu3 = ReLU()(hidden2)
+    dropout3 = Dropout(0.4)(relu3)
 
-## output layer with softmax(2) and dropout
-output = Linear(32, 2)(dropout3)
-softmax = SoftMax().set_name("output")(output)
+    ## output layer with softmax(2) and dropout
+    output = Linear(32, 2)(dropout3)
+    softmax = SoftMax().set_name("output")(output)
 
-model = Model([initial], [softmax])
+    return Model([initial], [softmax])
+
+# In[24]:
+
+
+if (os.path.exists(local_model_file_path) and os.path.exists(local_model_weights_file_path)):
+    print("Got existing model .. loading ..")
+    model = Model.loadModel(local_model_file_path, local_model_weights_file_path) # load from local fs
+else:
+    model = make_new_model(X_train)
 
 
 # ## Optimize and Train
 
-# In[23]:
+# In[25]:
 
 
 learning_rate = 0.001
@@ -333,16 +359,20 @@ optimizer.set_val_summary(val_summary)
 print("saving logs to ", app_name)
 
 
-# In[24]:
+# In[26]:
 
 
 # get_ipython().run_cell_magic('time', '', '# Boot training process\ntrained_model = optimizer.optimize()\nprint("Optimization Done.")')
+
 trained_model = optimizer.optimize()
 print("Optimization Done.")
 
 
-# In[25]:
+# In[27]:
 
+
+# save BigDL model locally
+model.saveModel(local_model_file_path, local_model_weights_file_path, True) # save to local fs
 
 # model.save_tensorflow([("input", [1, 3])], "/tmp/model.pb")
 model.save_tensorflow([("input", [1, 3])], model_pb_file_path)
@@ -350,22 +380,22 @@ model.save_tensorflow([("input", [1, 3])], model_pb_file_path)
 loss = np.array(train_summary.read_scalar("Loss"))
 top1 = np.array(val_summary.read_scalar("Top1Accuracy"))
 
-# plt.figure(figsize = (12,12))
-# plt.subplot(2,1,1)
-# plt.plot(loss[:,0],loss[:,1],label='loss')
-# plt.xlim(0,loss.shape[0]+10)
-# plt.grid(True)
-# plt.title("loss")
-# plt.subplot(2,1,2)
-# plt.plot(top1[:,0],top1[:,1],label='top1')
-# plt.xlim(0,loss.shape[0]+10)
-# plt.title("top1 accuracy")
-# plt.grid(True)
+plt.figure(figsize = (12,12))
+plt.subplot(2,1,1)
+plt.plot(loss[:,0],loss[:,1],label='loss')
+plt.xlim(0,loss.shape[0]+10)
+plt.grid(True)
+plt.title("loss")
+plt.subplot(2,1,2)
+plt.plot(top1[:,0],top1[:,1],label='top1')
+plt.xlim(0,loss.shape[0]+10)
+plt.title("top1 accuracy")
+plt.grid(True)
 
 
 # # Predict on test set
 
-# In[26]:
+# In[28]:
 
 
 def map_predict_label(l):
@@ -374,13 +404,13 @@ def map_groundtruth_label(l):
     return int(l[0] - 1)
 
 
-# In[27]:
+# In[29]:
 
 
 predictions = trained_model.predict(test_data)
 
 
-# In[28]:
+# In[30]:
 
 
 # get_ipython().run_cell_magic('time', '', "predictions = trained_model.predict(test_data)\nprint('Ground Truth labels:')\nprint(', '.join(str(map_groundtruth_label(s.label.to_ndarray())) for s in test_data.take(50)))\nprint('Predicted labels:')\nprint(', '.join(str(map_predict_label(s)) for s in predictions.take(50)))")
@@ -392,7 +422,7 @@ print('Predicted labels:')
 print(', '.join(str(map_predict_label(s)) for s in predictions.take(50)))
 
 
-# In[29]:
+# In[31]:
 
 
 labels = [map_groundtruth_label(s.label.to_ndarray()) for s in test_data.take(20000)]
@@ -401,7 +431,7 @@ predicted_labels = [map_predict_label(s) for s in predictions.take(20000)]
 df_prediction['Prediction'] = predicted_labels
 
 
-# In[30]:
+# In[32]:
 
 
 total_size = X_test.shape[0]
@@ -412,7 +442,7 @@ print(mismatch_size)
 print(accuracy)
 
 
-# In[31]:
+# In[33]:
 
 
 import datetime
@@ -428,10 +458,72 @@ with open(model_attrib_file_path, "w") as fp:
     fp.write("generatedAt=" + str(datetime.datetime.now()) + "\n")
 
 
-# In[ ]:
+# In[34]:
 
 
 with open(generation_complete_file_path, "w") as fp:
     fp.write(str(datetime.datetime.now()))
 
+
+# ## Predict on a new dataset
+
+# In[35]:
+
+
+df = pd.read_csv("data/CPU_examples_test.csv")
+
+## standardize and widen
+df['CPU'] = df['CPU'].apply(lambda x: (x - scaler_mean) / scaler_var)
+X_test = widenX(lookback, df['CPU'])
+Y_test = widenY(lookback, df['Class'])
+
+print(X_test.shape)
+anomaly = df[df.Class == 1]
+anomaly.shape
+
+
+# In[36]:
+
+
+def get_rdd_from_ndarray_test(sc):
+    rdd_X_test = sc.parallelize(X_test)
+    rdd_Y_test = sc.parallelize(Y_test)
+
+    rdd_test_sample = rdd_X_test.zip(rdd_Y_test).map(lambda labeledFeatures:
+                                     common.Sample.from_ndarray(labeledFeatures[0], labeledFeatures[1]+1))
+    return rdd_test_sample
+
+test_data = get_rdd_from_ndarray_test(sc)
+
+
+# In[37]:
+
+
+# get_ipython().run_cell_magic('time', '', "predictions = trained_model.predict(test_data)\nprint('Ground Truth labels:')\nprint(', '.join(str(map_groundtruth_label(s.label.to_ndarray())) for s in test_data.take(50)))\nprint('Predicted labels:')\nprint(', '.join(str(map_predict_label(s)) for s in predictions.take(50)))")
+
+predictions = trained_model.predict(test_data)
+print('Ground Truth labels:')
+print(', '.join(str(map_groundtruth_label(s.label.to_ndarray())) for s in test_data.take(50)))
+print('Predicted labels:')
+print(', '.join(str(map_predict_label(s)) for s in predictions.take(50)))
+
+
+# In[38]:
+
+
+labels = [map_groundtruth_label(s.label.to_ndarray()) for s in test_data.take(X_test.shape[0])]
+df_prediction = pd.DataFrame({'Real Class' :np.array(labels)})
+predicted_labels = [map_predict_label(s) for s in predictions.take(X_test.shape[0])]
+df_prediction['Prediction'] = predicted_labels
+
+
+# In[39]:
+
+
+total_size = X_test.shape[0]
+mismatch_size = df_prediction[ df_prediction['Real Class'] != df_prediction['Prediction'] ].size
+accuracy = ((total_size - mismatch_size) / total_size) * 100
+print(total_size)
+print(mismatch_size)
+print(accuracy)
 
