@@ -380,17 +380,17 @@ model.save_tensorflow([("input", [1, 3])], model_pb_file_path)
 loss = np.array(train_summary.read_scalar("Loss"))
 top1 = np.array(val_summary.read_scalar("Top1Accuracy"))
 
-plt.figure(figsize = (12,12))
-plt.subplot(2,1,1)
-plt.plot(loss[:,0],loss[:,1],label='loss')
-plt.xlim(0,loss.shape[0]+10)
-plt.grid(True)
-plt.title("loss")
-plt.subplot(2,1,2)
-plt.plot(top1[:,0],top1[:,1],label='top1')
-plt.xlim(0,loss.shape[0]+10)
-plt.title("top1 accuracy")
-plt.grid(True)
+# plt.figure(figsize = (12,12))
+# plt.subplot(2,1,1)
+# plt.plot(loss[:,0],loss[:,1],label='loss')
+# plt.xlim(0,loss.shape[0]+10)
+# plt.grid(True)
+# plt.title("loss")
+# plt.subplot(2,1,2)
+# plt.plot(top1[:,0],top1[:,1],label='top1')
+# plt.xlim(0,loss.shape[0]+10)
+# plt.title("top1 accuracy")
+# plt.grid(True)
 
 
 # # Predict on test set
@@ -464,66 +464,4 @@ with open(model_attrib_file_path, "w") as fp:
 with open(generation_complete_file_path, "w") as fp:
     fp.write(str(datetime.datetime.now()))
 
-
-# ## Predict on a new dataset
-
-# In[35]:
-
-
-df = pd.read_csv("data/CPU_examples_test.csv")
-
-## standardize and widen
-df['CPU'] = df['CPU'].apply(lambda x: (x - scaler_mean) / scaler_var)
-X_test = widenX(lookback, df['CPU'])
-Y_test = widenY(lookback, df['Class'])
-
-print(X_test.shape)
-anomaly = df[df.Class == 1]
-anomaly.shape
-
-
-# In[36]:
-
-
-def get_rdd_from_ndarray_test(sc):
-    rdd_X_test = sc.parallelize(X_test)
-    rdd_Y_test = sc.parallelize(Y_test)
-
-    rdd_test_sample = rdd_X_test.zip(rdd_Y_test).map(lambda labeledFeatures:
-                                     common.Sample.from_ndarray(labeledFeatures[0], labeledFeatures[1]+1))
-    return rdd_test_sample
-
-test_data = get_rdd_from_ndarray_test(sc)
-
-
-# In[37]:
-
-
-# get_ipython().run_cell_magic('time', '', "predictions = trained_model.predict(test_data)\nprint('Ground Truth labels:')\nprint(', '.join(str(map_groundtruth_label(s.label.to_ndarray())) for s in test_data.take(50)))\nprint('Predicted labels:')\nprint(', '.join(str(map_predict_label(s)) for s in predictions.take(50)))")
-
-predictions = trained_model.predict(test_data)
-print('Ground Truth labels:')
-print(', '.join(str(map_groundtruth_label(s.label.to_ndarray())) for s in test_data.take(50)))
-print('Predicted labels:')
-print(', '.join(str(map_predict_label(s)) for s in predictions.take(50)))
-
-
-# In[38]:
-
-
-labels = [map_groundtruth_label(s.label.to_ndarray()) for s in test_data.take(X_test.shape[0])]
-df_prediction = pd.DataFrame({'Real Class' :np.array(labels)})
-predicted_labels = [map_predict_label(s) for s in predictions.take(X_test.shape[0])]
-df_prediction['Prediction'] = predicted_labels
-
-
-# In[39]:
-
-
-total_size = X_test.shape[0]
-mismatch_size = df_prediction[ df_prediction['Real Class'] != df_prediction['Prediction'] ].size
-accuracy = ((total_size - mismatch_size) / total_size) * 100
-print(total_size)
-print(mismatch_size)
-print(accuracy)
 
