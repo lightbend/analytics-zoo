@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[39]:
 
 
 from __future__ import division
@@ -9,6 +9,7 @@ from __future__ import division
 import math
 import pandas as pd
 import datetime as dt
+import ConfigParser
 
 import matplotlib.pyplot as plt
 from scipy import stats
@@ -32,7 +33,7 @@ LABELS = ["Normal", "Anomaly"]
 lookback = 3
 
 
-# In[2]:
+# In[40]:
 
 
 from bigdl.nn.layer import *
@@ -45,7 +46,7 @@ sc = SparkContext.getOrCreate(conf=create_spark_conf().setMaster("local[4]").set
 init_engine()
 
 
-# In[3]:
+# In[41]:
 
 
 import os
@@ -69,8 +70,9 @@ if not model_pb_file_path:
 if not model_attrib_file_path:
     model_attrib_file_path = '/tmp/model-attributes.properties'
 
-local_model_file_path = '/tmp/model.bigdl'
-local_model_weights_file_path = '/tmp/model.bin'
+# local_model_file_path = '/tmp/model.bigdl'
+# local_model_weights_file_path = '/tmp/model.bin'
+hyperparams_file_path = '/tmp/hyperparams.properties'
 
 print(data_file_path)
 print(generation_complete_file_path)
@@ -80,19 +82,19 @@ print(model_attrib_file_path)
 
 # ## Read data from csv
 
-# In[4]:
+# In[42]:
 
 
 df = pd.read_csv(data_file_path)
 
 
-# In[5]:
+# In[43]:
 
 
 df.shape
 
 
-# In[6]:
+# In[44]:
 
 
 df.head()
@@ -100,7 +102,7 @@ df.head()
 
 # ## Basic sanity check of data and normalization
 
-# In[7]:
+# In[45]:
 
 
 # check for null data
@@ -119,7 +121,7 @@ print(scaler_var)   ## std dev
 df.head()
 
 
-# In[8]:
+# In[46]:
 
 
 # let's explore the distribution of input data
@@ -132,7 +134,7 @@ print(count_classes.count)
 # plt.ylabel("Frequency");
 
 
-# In[9]:
+# In[47]:
 
 
 # Just checking the relative counts
@@ -142,19 +144,19 @@ normal = df[df.Class == 0]
 anomaly.shape
 
 
-# In[10]:
+# In[48]:
 
 
 normal.shape
 
 
-# In[11]:
+# In[49]:
 
 
 anomaly.CPU.describe()
 
 
-# In[12]:
+# In[50]:
 
 
 normal.CPU.describe()
@@ -162,7 +164,7 @@ normal.CPU.describe()
 
 # ## Any correlation between time and CPU metrics ?
 
-# In[13]:
+# In[51]:
 
 
 # f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
@@ -181,7 +183,7 @@ normal.CPU.describe()
 
 # ## Feature Re-engineering
 
-# In[14]:
+# In[52]:
 
 
 def widenX(width, x) :
@@ -201,7 +203,7 @@ def widenY(width, y):
     return y[width-1:]
 
 
-# In[15]:
+# In[53]:
 
 
 df.head()
@@ -209,21 +211,21 @@ anomaly = df[df.Class == 1]
 anomaly.shape
 
 
-# In[16]:
+# In[54]:
 
 
 X_train = widenX(lookback, df['CPU'])
 X_train.shape
 
 
-# In[17]:
+# In[55]:
 
 
 Y_train = widenY(lookback, df['Class'])
 Y_train.shape
 
 
-# In[18]:
+# In[56]:
 
 
 class_0 = list(filter(lambda x: x == 0.0, Y_train)) 
@@ -233,7 +235,7 @@ print(len(class_0), len(class_1))
 
 # ## Split into training and test set
 
-# In[19]:
+# In[57]:
 
 
 original_X_train_size = X_train.shape[0]
@@ -252,13 +254,13 @@ print(X_train.shape)
 print(X_test.shape)
 
 
-# In[20]:
+# In[58]:
 
 
 X_train.shape
 
 
-# In[21]:
+# In[59]:
 
 
 X_test.shape
@@ -266,7 +268,7 @@ X_test.shape
 
 # In order to get data into BigDL engine we need to convert the numpy arrays into Spark RDD. Here's a helper function that does this. Note that we will use negative log likelihood for loss computation - hence based on the documentation of BigDL, the labels need to start from 1. Hence we add a 1 in the function below to all the labels.
 
-# In[22]:
+# In[60]:
 
 
 def get_rdd_from_ndarray(sc):
@@ -286,7 +288,7 @@ def get_rdd_from_ndarray(sc):
 
 # # Build the Model
 
-# In[23]:
+# In[61]:
 
 
 # create a graph model
@@ -313,7 +315,49 @@ def make_new_model(X_train):
 
     return Model([initial], [softmax])
 
-# In[24]:
+
+# ## Fetch Hyperparameters
+
+# We want to fetch hyperparameters from a file. Besides externalizing the hyperparameters, this also allows us to train multiple models by passing in different hyperparameters.
+
+# In[62]:
+
+
+# read hyperparameters from file, if exists
+if (os.path.exists(hyperparams_file_path)):
+    print("Got hyperparameter file ..")    
+    config = ConfigParser.RawConfigParser()
+    config.read(hyperparams_file_path)
+    learning_rate = float(config.get('HyperparameterSection', 'learning_rate'))
+    training_epochs = int(config.get('HyperparameterSection', 'training_epochs'))
+    batch_size = int(config.get('HyperparameterSection', 'batch_size'))
+else:
+    learning_rate = 0.001
+    training_epochs = 8
+    batch_size = 256
+    
+print('learning rate', learning_rate)
+print('training epochs', training_epochs)
+print('batch size', batch_size)
+
+# since we save the model every time, we need to hash the file name based on hyperparameter
+# settings, so that the correct file name is picked up when we attempt to find and load an exiating model
+local_model_file_path = '/tmp/model-' + str(learning_rate) + '-' + str(training_epochs) + '-' + str(batch_size) + '.bigdl'
+local_model_weights_file_path = '/tmp/model-' + str(learning_rate) + '-' + str(training_epochs) + '-' + str(batch_size) + '.bin'
+
+
+# In[63]:
+
+
+print(local_model_file_path)
+print(local_model_weights_file_path)
+
+
+# ## Load Model for Incremental Learning
+
+# We would like to do incremental learning. Hence if we find an existing BigDL model and the weights, then we load from that model and then continue training. Else we build the new model. The model and the weights file names are hashed based on hyperparameter settings.
+
+# In[64]:
 
 
 if (os.path.exists(local_model_file_path) and os.path.exists(local_model_weights_file_path)):
@@ -325,12 +369,8 @@ else:
 
 # ## Optimize and Train
 
-# In[25]:
+# In[65]:
 
-
-learning_rate = 0.001
-training_epochs = 8
-batch_size = 256
 
 optimizer = Optimizer(
     model = model,
@@ -359,16 +399,15 @@ optimizer.set_val_summary(val_summary)
 print("saving logs to ", app_name)
 
 
-# In[26]:
+# In[66]:
 
 
 # get_ipython().run_cell_magic('time', '', '# Boot training process\ntrained_model = optimizer.optimize()\nprint("Optimization Done.")')
-
 trained_model = optimizer.optimize()
 print("Optimization Done.")
 
 
-# In[27]:
+# In[67]:
 
 
 # save BigDL model locally
@@ -395,7 +434,7 @@ top1 = np.array(val_summary.read_scalar("Top1Accuracy"))
 
 # # Predict on test set
 
-# In[28]:
+# In[68]:
 
 
 def map_predict_label(l):
@@ -404,17 +443,16 @@ def map_groundtruth_label(l):
     return int(l[0] - 1)
 
 
-# In[29]:
+# In[69]:
 
 
 predictions = trained_model.predict(test_data)
 
 
-# In[30]:
+# In[70]:
 
 
 # get_ipython().run_cell_magic('time', '', "predictions = trained_model.predict(test_data)\nprint('Ground Truth labels:')\nprint(', '.join(str(map_groundtruth_label(s.label.to_ndarray())) for s in test_data.take(50)))\nprint('Predicted labels:')\nprint(', '.join(str(map_predict_label(s)) for s in predictions.take(50)))")
-
 predictions = trained_model.predict(test_data)
 print('Ground Truth labels:')
 print(', '.join(str(map_groundtruth_label(s.label.to_ndarray())) for s in test_data.take(50)))
@@ -422,7 +460,7 @@ print('Predicted labels:')
 print(', '.join(str(map_predict_label(s)) for s in predictions.take(50)))
 
 
-# In[31]:
+# In[71]:
 
 
 labels = [map_groundtruth_label(s.label.to_ndarray()) for s in test_data.take(20000)]
@@ -431,7 +469,7 @@ predicted_labels = [map_predict_label(s) for s in predictions.take(20000)]
 df_prediction['Prediction'] = predicted_labels
 
 
-# In[32]:
+# In[72]:
 
 
 total_size = X_test.shape[0]
@@ -442,7 +480,7 @@ print(mismatch_size)
 print(accuracy)
 
 
-# In[33]:
+# In[73]:
 
 
 import datetime
@@ -458,10 +496,9 @@ with open(model_attrib_file_path, "w") as fp:
     fp.write("generatedAt=" + str(datetime.datetime.now()) + "\n")
 
 
-# In[34]:
+# In[74]:
 
 
 with open(generation_complete_file_path, "w") as fp:
     fp.write(str(datetime.datetime.now()))
-
 
