@@ -6,7 +6,7 @@ function make_hyperparams_file {
   local training_epochs="$2"
   local batch_size="$3"
 
-  cat <<EOM >$FILE
+  cat <<EOM >$HYPERPARAMS_FILE_NAME
 [HyperparameterSection]
 learning_rate = $learning_rate
 training_epochs = $training_epochs
@@ -25,7 +25,7 @@ do
   echo "Data generation completed .."
   cat $filename
 
-  FILE="/tmp/hyperparams.properties"
+  echo Hyperparams file : $HYPERPARAMS_FILE_NAME
 
   declare -a learning_rate=('0.001' '0.005' '0.001')
   declare -a training_epochs=('8' '8' '8')
@@ -37,6 +37,7 @@ do
   counter=0
   while [  $counter -lt $hyperparam_count ]; do
     make_hyperparams_file ${learning_rate[$counter]} ${training_epochs[$counter]} ${batch_size[$counter]} 
+    cat $HYPERPARAMS_FILE_NAME
 
     echo "Starting training .."
     analytics-zoo/scripts/spark-submit-with-zoo.sh dnn_anomaly_bigdl.py

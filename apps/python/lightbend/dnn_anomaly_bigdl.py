@@ -56,6 +56,7 @@ data_file_path = os.getenv("DATA_FILE_NAME")
 generation_complete_file_path = os.getenv("GENERATION_COMPLETE_FILE_NAME")
 model_pb_file_path = os.getenv("MODEL_PB_FILE_NAME")
 model_attrib_file_path = os.getenv("MODEL_ATTRIB_FILE_NAME")
+hyperparams_file_path = os.getenv("HYPERPARAMS_FILE_NAME")
 
 ## for local runs possibly these will not be set in the environment
 if not data_file_path:
@@ -72,12 +73,15 @@ if not model_attrib_file_path:
 
 # local_model_file_path = '/tmp/model.bigdl'
 # local_model_weights_file_path = '/tmp/model.bin'
-hyperparams_file_path = '/tmp/hyperparams.properties'
+
+if not hyperparams_file_path:
+    hyperparams_file_path = '/tmp/hyperparams.properties'
 
 print(data_file_path)
 print(generation_complete_file_path)
 print(model_pb_file_path)
 print(model_attrib_file_path)
+print(hyperparams_file_path)
 
 
 # ## Read data from csv
