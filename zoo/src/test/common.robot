@@ -45,19 +45,8 @@ Stop Verticals
    :FOR                ${vertical}         IN                @{verticalList}
    \                   Operate Vertical    ${vertical}       stop               deployed/stopped
 
-Check DataSource
-   Log To Console   check data source for zoo test
-   Create Session   webhdfs               http://${public_hdfs_host}:50070
-   ${resp}=         Get Request           webhdfs        /webhdfs/v1/${imagenet}?op=GETFILESTATUS
-   Should Contain   ${resp.content}       DIRECTORY
-   ${resp}=         Get Request           webhdfs        /webhdfs/v1/${mnist}?op=GETFILESTATUS
-   Should Contain   ${resp.content}       DIRECTORY
-   ${resp}=         Get Request           webhdfs        /webhdfs/v1/${cifar}?op=GETFILESTATUS
-   Should Contain   ${resp.content}       DIRECTORY
-
 Prepare DataSource And Verticals
    Get Zoo Version
-   Check DataSource
    Check Verticals
 
 Check Verticals
@@ -75,5 +64,5 @@ Get Zoo Version
    ${version}=            Get Element Text    ${root}    version
    Log To Console         ${version}
    Set Global Variable    ${version}
-   ${jar_path}=           Set Variable        ${jar_dir}/analytics-zoo-${version}-jar-with-dependencies.jar
+   ${jar_path}=           Set Variable        ${jar_dir}/analytics-zoo-bigdl_${bigdl_version}-spark_${spark_version}-${version}-jar-with-dependencies.jar
    Set Global Variable    ${jar_path}

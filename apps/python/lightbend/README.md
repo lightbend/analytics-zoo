@@ -80,24 +80,34 @@ print("Optimization Done.")
 Also remove all plot statements from the python script.
 
 ## Prepare docker image with the script
-
+First build an image for IntelBigDL using [dockerfile](,/docker/Dockerfile)
+````
+docker build \
+    --build-arg ANALYTICS_ZOO_VERSION=0.3.0 \
+    --build-arg BIGDL_VERSION=0.6.0 \
+    --build-arg SPARK_VERSION=2.3.1 \
+    --rm -t lightbend/analytics-zoo:0.3.0-bigdl_0.6.0-spark_2.3.1 .
+````
+At the moment, INtel only supports Spark 2.3.1
+Now use this image as a starting point for building Anomaly detection image
 ```
 $ pwd
 <project home>/apps/python/lightbend
-$ docker build --rm -t lightbend/analytics-zoo:0.1.0-spark-2.2.0 .
+$ docker build --rm -t lightbend/amomaly-detection-intel-bigdl:2.0 .
 ```
 
 ## Run docker image
 
-When running the docker image we need to mount the host folder containing `data/CPU_examples.csv` to the container folder `/opt/work/data`.
+When running the docker image we need to mount the host folder (make sure to use the full, not relative name) containing `data/CPU_examples.csv` to the container folder `/opt/work/data`.
 
 ```
 $ docker run -it --rm -v <data folder>:/opt/work/data lightbend/analytics-zoo:0.1.0-spark-2.2.0 bash
 root@3d7a2d664c77:/opt/work# pwd
 /opt/work
 root@3d7a2d664c77:/opt/work# ls
-analytics-zoo  analytics-zoo-0.1.0  analytics-zoo-SPARK_2.2-0.1.0-dist.zip  data  dnn_anomaly_bigdl.py  download-analytics-zoo.sh  get-pip.py  spark-2.2.0  start-notebook.sh
-root@3d7a2d664c77:/opt/work# analytics-zoo/scripts/spark-submit-with-zoo.sh dnn_anomaly_bigdl.py
+analytics-zoo-0.3.0                                       data                  download-analytics-zoo.sh  spark-2.3.1
+analytics-zoo-bigdl_0.6.0-spark_2.3.1-0.3.0-dist-all.zip  dnn_anomaly_bigdl.py  get-pip.py                 start-notebook.sh
+root@3d7a2d664c77:/opt/work# analytics-zoo-0.3.0/bin/spark-submit-with-zoo.sh dnn_anomaly_bigdl.py
 ```
 
 The above command will run the training of the model using the data files in `data` folder and generate a Tensorflow model in `/tmp/model.pb`. This can be used for scoring.

@@ -16,16 +16,15 @@
 
 package com.intel.analytics.zoo.pipeline.api.autograd
 
-import com.intel.analytics.bigdl.nn.{Container, Unsqueeze}
 import com.intel.analytics.bigdl.nn.Graph.ModuleNode
 import com.intel.analytics.bigdl.nn.abstractnn.{AbstractModule, Activity, InferShape}
 import com.intel.analytics.bigdl.nn.keras.KerasLayer
 import com.intel.analytics.bigdl.tensor.Tensor
 import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric
-import com.intel.analytics.bigdl.utils.serializer.{ModuleSerializable, ModuleSerializer}
-import com.intel.analytics.bigdl.utils.{Engine, Shape}
+import com.intel.analytics.bigdl.utils._
 import com.intel.analytics.bigdl.{nn => bnn}
 import com.intel.analytics.zoo.pipeline.api.keras.layers._
+import com.intel.analytics.zoo.pipeline.api.keras.layers.internal.{InternalCAddTable, InternalMM}
 import com.intel.analytics.zoo.pipeline.api.keras.models._
 
 import scala.reflect.ClassTag
@@ -42,42 +41,78 @@ object AutoGrad {
       axis
     }
   }
-
-  def abs[T: ClassTag](a: Variable[T])(
+  /**
+   * Element-wise absolute value.
+   * @param x A variable.
+   * @return A variable.
+   */
+  def abs[T: ClassTag](x: Variable[T])(
       implicit ev: TensorNumeric[T]): Variable[T] = {
     val o: KerasLayer[Activity, Activity, T] =
       new KerasLayerWrapper[T](bnn.Abs[T]().asInstanceOf[AbstractModule[Activity, Activity, T]])
-    Variable(o.inputs(a.node))
+    Variable(o.inputs(x.node))
   }
 
-  def sum[T: ClassTag](a: Variable[T], axis: Int = 0, keepdims: Boolean = false)(
+  /**
+   * Sum of the values in a variable, alongside the specified axis.
+   * @param x A variable.
+   * @param axis axis to compute the mean. 0-based indexed.
+   * @param keepDims A boolean, whether to keep the dimensions or not.
+   * If `keepDims` is `False`, the rank of the variable is reduced
+   * by 1. If `keepDims` is `True`,
+   * the reduced dimensions are retained with length 1.
+   * @return A variable with the mean of elements of `x`.
+   */
+  def sum[T: ClassTag](x: Variable[T], axis: Int = 0, keepDims: Boolean = false)(
       implicit ev: TensorNumeric[T]): Variable[T] = {
     val o: KerasLayer[Activity, Activity, T] =
       new KerasLayerWrapper[T](bnn.Sum[T](dimension = normalizeAxis(axis) + 1,
-        squeeze = !keepdims).asInstanceOf[AbstractModule[Activity, Activity, T]])
-    Variable(o.inputs(a.node))
+        squeeze = !keepDims).asInstanceOf[AbstractModule[Activity, Activity, T]])
+    Variable(o.inputs(x.node))
   }
 
-  def clip[T: ClassTag](a: Variable[T], min: Double, max: Double)(
+  /**
+   * Element-wise value clipping.
+   * @param x A variable.
+   * @param min Double.
+   * @param max Double.
+   * @return A variable.
+   */
+  def clip[T: ClassTag](x: Variable[T], min: Double, max: Double)(
       implicit ev: TensorNumeric[T]): Variable[T] = {
     val o: KerasLayer[Activity, Activity, T] =
       new KerasLayerWrapper[T](
         bnn.HardTanh[T](minValue = min,
           maxValue = max).asInstanceOf[AbstractModule[Activity, Activity, T]])
-    Variable(o.inputs(a.node))
+    Variable(o.inputs(x.node))
   }
 
-  def square[T: ClassTag](a: Variable[T])(
+  /**
+   * Element-wise square.
+   * @param x A variable.
+   * @return A variable.
+   */
+  def square[T: ClassTag](x: Variable[T])(
       implicit ev: TensorNumeric[T]): Variable[T] = {
-    Variable(Square[T]().inputs(a.node))
+    Variable(Square[T]().inputs(x.node))
   }
 
-
-  def sqrt[T: ClassTag](a: Variable[T])(
+  /**
+   * Element-wise square root.
+   * @param x A variable.
+   * @return A variable.
+   */
+  def sqrt[T: ClassTag](x: Variable[T])(
       implicit ev: TensorNumeric[T]): Variable[T] = {
-    Variable(Sqrt[T]().inputs(a.node))
+    Variable(Sqrt[T]().inputs(x.node))
   }
 
+  /**
+   * Element-wise maximum of two variables
+   * @param x A variable.
+   * @param y A variable.
+   * @return A variable.
+   */
   def maximum[T: ClassTag](x: Variable[T], y: Variable[T])(
       implicit ev: TensorNumeric[T]): Variable[T] = {
     val o: KerasLayer[Activity, Activity, T] =
@@ -86,6 +121,12 @@ object AutoGrad {
     Variable(o.inputs(x.node, y.node))
   }
 
+  /**
+   * Element-wise maximum of two variables
+   * @param x A variable.
+   * @param y Double
+   * @return A variable.
+   */
   def maximum[T: ClassTag](x: Variable[T], y: Double)(
       implicit ev: TensorNumeric[T]): Variable[T] = {
     clip(x, min = y, max = Double.MaxValue)
@@ -95,8 +136,8 @@ object AutoGrad {
    * Mean of a tensor, alongside the specified axis.
    * @param axis axis to compute the mean. 0-based indexed.
    * @param keepDims A boolean, whether to keep the dimensions or not.
-   *If `keepdims` is `False`, the rank of the tensor is reduced
-   *by 1. If `keep_dims` is `True`,
+   *If `keepDims` is `False`, the rank of the tensor is reduced
+   *by 1. If `keepDims` is `True`,
    *the reduced dimensions are retained with length 1.
    * @return
    *         A tensor with the mean of elements of `x`.
@@ -109,44 +150,74 @@ object AutoGrad {
     Variable(o.inputs(x.node))
   }
 
-  def log[T: ClassTag](a: Variable[T])(
+  /**
+   * Element-wise log.
+   * @param x A variable.
+   * @return A variable.
+   */
+  def log[T: ClassTag](x: Variable[T])(
       implicit ev: TensorNumeric[T]): Variable[T] = {
-    Variable(Log[T]().inputs(a.node))
+    Variable(Log[T]().inputs(x.node))
   }
 
+  /**
+   * Define the value of epsilon.
+   * @return A value of type Double.
+   */
   def epsilon[T: ClassTag]()(
       implicit ev: TensorNumeric[T]): Double = {
     EPSILON
   }
 
+  /**
+   * Element-wise exponential.
+   * @param x A variable.
+   * @return A variable.
+   */
   def exp[T: ClassTag](x: Variable[T])(
       implicit ev: TensorNumeric[T]): Variable[T] = {
     Variable(Exp[T]().inputs(x.node))
   }
 
+  /**
+   * Element-wise exponentiation.
+   * @param x A variable.
+   * @param a Double.
+   * @return A variable.
+   */
   def pow[T: ClassTag](x: Variable[T], a: Double)(
       implicit ev: TensorNumeric[T]): Variable[T] = {
     Variable(Power[T](a).inputs(x.node))
   }
 
-  def softsign[T: ClassTag](a: Variable[T])(
+  /**
+   * Softsign of a variable.
+   * @param x A variable.
+   * @return A variable.
+   */
+  def softsign[T: ClassTag](x: Variable[T])(
     implicit ev: TensorNumeric[T]): Variable[T] = {
     val o: KerasLayer[Activity, Activity, T] =
       new KerasLayerWrapper(bnn.SoftSign[T]().asInstanceOf[AbstractModule[Activity, Activity, T]])
-    Variable(o.inputs(a.node))
+    Variable(o.inputs(x.node))
   }
 
-  def softplus[T: ClassTag](a: Variable[T])(
+  /**
+   * Softplus of a variable.
+   * @param x A variable.
+   * @return A variable.
+   */
+  def softplus[T: ClassTag](x: Variable[T])(
     implicit ev: TensorNumeric[T]): Variable[T] = {
     val o: KerasLayer[Activity, Activity, T] =
       new KerasLayerWrapper(bnn.SoftPlus[T]().asInstanceOf[AbstractModule[Activity, Activity, T]])
-    Variable(o.inputs(a.node))
+    Variable(o.inputs(x.node))
   }
 
   /**
    * Stacks a list of rank `R` tensors into a rank `R+1` tensor.
    * @param inputs: List of variables (tensors).
-   * @param axis xis along which to perform stacking.
+   * @param axis axis along which to perform stacking.
    */
   def stack[T: ClassTag](inputs: List[Variable[T]], axis: Int = 1)(
       implicit ev: TensorNumeric[T]): Variable[T] = {
@@ -157,7 +228,8 @@ object AutoGrad {
 
   /**
    * Adds a 1-sized dimension at index "axis".
-   * @param axis Position where to add a new axis. You should start from 1 as dim 0 is for batch.
+   * The axis is 0 based and if you set the axis to 0, you would change the batch dim.
+   * @param axis Position where to add a new axis.
    */
   def expandDims[T: ClassTag](x: Variable[T], axis: Int)(
       implicit ev: TensorNumeric[T]): Variable[T] = {
@@ -175,6 +247,95 @@ object AutoGrad {
       bnn.Contiguous[T]().asInstanceOf[AbstractModule[Activity, Activity, T]]).inputs(input.node)
     Variable(contiguousNode)
   }
+
+  /**
+   * Module to perform matrix multiplication on two mini-batch inputs,
+   * producing a mini-batch.
+   *
+   * @param x A variable.
+   * @param y A variable.
+   * @param axes Axes along which to perform multiplication.
+   */
+  def mm[T: ClassTag](
+      x: Variable[T],
+      y: Variable[T],
+      axes: List[Int] = null)(implicit ev: TensorNumeric[T]): Variable[T] = {
+    require(x.getOutputShape().isInstanceOf[SingleShape], "Only accept single shape")
+    require(y.getOutputShape().isInstanceOf[SingleShape], "Only accept single shape")
+    val xShape = x.getOutputShape().toSingle().toArray
+    val yShape = y.getOutputShape().toSingle().toArray
+    var transposeX = false
+    var transposeY = false
+    var left = 0
+    var right = 0
+    if (xShape.length == 2 && yShape.length == 2) {
+      left = 0
+      right = 1
+      } else if ((xShape.length == 3 && yShape.length == 3)) {
+      left = 1
+      right = 2
+      } else {
+        throw new IllegalArgumentException(s"Only support 2D and 3D input for now," +
+          s"but got [${xShape.mkString(",")}] and [${xShape.mkString(",")}]")
+      }
+    if (axes != null) {
+      require(axes.length == 2, s"axes.length should be 2, but got: ${axes.length}")
+      require(axes(0) >= left && axes(0) <= right,
+        s"axes should between [$left, $right], not ${axes(0)}")
+      require(axes(1) >= left && axes(1) <= right,
+        s"axes should between [$left, $right], not ${axes(1)}")
+      transposeX = if (axes(0) != xShape.length - 1) {true} else {false}
+      transposeY = if (axes(1) == yShape.length - 1) {true} else {false}
+    }
+
+
+    val mm = InternalMM[T](transA = transposeX,
+      transB = transposeY)
+    val kmm = new KerasLayerWrapper[T](mm.asInstanceOf[AbstractModule[Activity, Activity, T]])
+    kmm.from(x, y)
+  }
+
+  /**
+   * Normalizes a tensor wrt the L2 norm alongside the specified axis.
+   *
+   * @param x A variable.
+   * @param axis Axis along which to perform multiplication.
+   */
+  def l2Normalize[T: ClassTag](x: Variable[T], axis: Int)
+      (implicit ev: TensorNumeric[T]): Variable[T] = {
+    val l2Normalize = x / sqrt(maximum(sum(x * x, axis, keepDims = true), epsilon()))
+    l2Normalize
+  }
+
+  /**
+   * Operator that computes a dot product between samples in two tensors.
+   *
+   * @param x A variable.
+   * @param y A variable.
+   * @param axes Axes along which to perform multiplication.
+   * @param normalize Whether to L2-normalize samples along the
+   *                  dot product axis before taking the dot product.
+   *                  If set to True, then the output of the dot product
+   *                  is the cosine proximity between the two samples.
+   */
+  def batchDot[T: ClassTag](x: Variable[T], y: Variable[T],
+                            axes: List[Int], normalize: Boolean = false)
+      (implicit ev: TensorNumeric[T]): Variable[T] = {
+  val xShape = x.getOutputShape().toSingle().toArray
+  if (!normalize) {
+    require(xShape.length == 2 || xShape.length == 3,
+      s"Only support 2D and 3D for now, but got: ${xShape.length}")
+    if (xShape.length == 2) {
+      sum(x*y, axis = 1, keepDims = true)
+    } else {
+      mm(x, y, axes)
+    }
+  } else {
+    val l2_x = l2Normalize(x, axes(0))
+    val l2_y = l2Normalize(y, axes(1))
+    batchDot(l2_x, l2_y, axes = axes)
+    }
+  }
 }
 
 object Variable extends {
@@ -190,17 +351,20 @@ object Variable extends {
   }
 }
 
-class Variable[T: ClassTag] private[zoo] (val node: ModuleNode[T], var name: String = null)(
+class Variable[T: ClassTag] private[zoo] (private[zoo] var node: ModuleNode[T],
+    var name: String = null)(
     implicit ev: TensorNumeric[T]) extends Serializable {
 
-  if (name == null) {
-    name = node.element.getName()
-  } else {
-    node.element.setName(name)
-  }
+  if (node != null) {
+    if (name == null) {
+      name = node.element.getName()
+    } else {
+      node.element.setName(name)
+    }
 
-  require(node.element.isInstanceOf[KerasLayer[Activity, Activity, T]])
-  require(node.element.asInstanceOf[InferShape].getOutputShape() != null)
+    require(node.element.isInstanceOf[KerasLayer[Activity, Activity, T]])
+    require(node.element.asInstanceOf[InferShape].getOutputShape() != null)
+  }
 
   private[zoo] def getRoots(): Array[ModuleNode[T]] = {
     val dfs = this.node.graph(reverse = true).DFS.toList.reverse
@@ -239,7 +403,7 @@ class Variable[T: ClassTag] private[zoo] (val node: ModuleNode[T], var name: Str
   // scalastyle:off
   def +(a: Variable[T]): Variable[T] = {
     val o =
-      new KerasLayerWrapper[T](bnn.CAddTable[T]().asInstanceOf[AbstractModule[Activity, Activity, T]])
+      new KerasLayerWrapper[T](new InternalCAddTable[T, T]().asInstanceOf[AbstractModule[Activity, Activity, T]])
     val (x, y) = broadcast(this, a)
     Variable(o.inputs(Array(x.node, y.node)))
   }
@@ -296,8 +460,19 @@ class Variable[T: ClassTag] private[zoo] (val node: ModuleNode[T], var name: Str
    * Squeeze(dims = null) will give output size (2, 3, 4)
    */
   def squeeze(dim: Int): Variable[T] = {
-    val layer = Squeeze[T](dim)
-    Variable(layer.inputs(this.node))
+    val dims = new Array[Int](1)
+    dims(0) = dim
+    squeeze(dims)
+  }
+
+  def squeeze(dims: Array[Int]): Variable[T] = {
+    val blayer = if (dims == null){
+       com.intel.analytics.bigdl.nn.Squeeze[T](null, batchMode = false)
+    } else {
+      com.intel.analytics.bigdl.nn.Squeeze[T](dims.map(x => x + 1), batchMode = false)
+    }
+    val klayer = new KerasLayerWrapper[T](blayer)
+    Variable(klayer.inputs(this.node))
   }
 
   /**
@@ -347,13 +522,23 @@ class Variable[T: ClassTag] private[zoo] (val node: ModuleNode[T], var name: Str
   }
 
   private[zoo] def broadcast(x: Variable[T], y: Variable[T]): (Variable[T], Variable[T]) = {
-    val yShape = y.getOutputShape().toSingle()
-    val xShape = x.getOutputShape().toSingle()
-    require(xShape.size == yShape.size,
-      s"The two variables should have the same dims," +
-        s"but got: ${xShape.size} and ${yShape.size}")
     var xx = x
     var yy = y
+
+    var yShape = yy.getOutputShape().toSingle()
+    var xShape = xx.getOutputShape().toSingle()
+    if (yShape.size > xShape.size) {
+      xx = AutoGrad.expandDims(x, 0)
+    } else if (yShape.size < xShape.size) {
+      yy = AutoGrad.expandDims(y, 0)
+    }
+    yShape = yy.getOutputShape().toSingle()
+    xShape = xx.getOutputShape().toSingle()
+    require(xShape.size == yShape.size,
+      s"The two variables should have the same dims," +
+        s"but got: ${x.getOutputShape().toSingle().mkString(",")}" +
+        s"and ${y.getOutputShape().toSingle().mkString(",")}")
+
     var i = yShape.length - 1
     while (i >= 1) { // Ignore the batch dim
       if (yShape(i) != xShape(i)) {
@@ -392,4 +577,3 @@ class Variable[T: ClassTag] private[zoo] (val node: ModuleNode[T], var name: Str
     Tensor[T](getInputShape().copyAndUpdate(0, batchSize).toSingle().toArray).fill(fillValue)
   }
 }
-

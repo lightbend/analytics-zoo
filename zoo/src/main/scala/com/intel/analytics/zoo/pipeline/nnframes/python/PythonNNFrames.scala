@@ -20,13 +20,13 @@ import java.util.{ArrayList => JArrayList, List => JList}
 
 import com.intel.analytics.bigdl.dataset.{Sample, Transformer}
 import com.intel.analytics.bigdl.optim.{OptimMethod, Trigger, ValidationMethod}
-import com.intel.analytics.bigdl.python.api.PythonBigDL
 import com.intel.analytics.bigdl.tensor.Tensor
 import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric
 import com.intel.analytics.bigdl.visualization.{TrainSummary, ValidationSummary}
 import com.intel.analytics.bigdl.{Criterion, Module}
+import com.intel.analytics.zoo.common.PythonZoo
 import com.intel.analytics.zoo.feature.common._
-import com.intel.analytics.zoo.feature.image.{ImageFeatureToTensor, RowToImageFeature}
+import com.intel.analytics.zoo.feature.image.RowToImageFeature
 import com.intel.analytics.zoo.pipeline.nnframes._
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.sql.DataFrame
@@ -41,11 +41,11 @@ object PythonNNFrames {
   def ofDouble(): PythonNNFrames[Double] = new PythonNNFrames[Double]()
 }
 
-class PythonNNFrames[T: ClassTag](implicit ev: TensorNumeric[T]) extends PythonBigDL[T] {
+class PythonNNFrames[T: ClassTag](implicit ev: TensorNumeric[T]) extends PythonZoo[T] {
 
   def nnReadImage(path: String, sc: JavaSparkContext, minParitions: Int,
-                  resizeH: Int, resizeW: Int): DataFrame = {
-    NNImageReader.readImages(path, sc.sc, minParitions, resizeH, resizeW)
+                  resizeH: Int, resizeW: Int, imageCodec: Int): DataFrame = {
+    NNImageReader.readImages(path, sc.sc, minParitions, resizeH, resizeW, imageCodec)
   }
 
   def createNNEstimator(
@@ -114,10 +114,6 @@ class PythonNNFrames[T: ClassTag](implicit ev: TensorNumeric[T]) extends PythonB
     MLlibVectorToTensor(size.asScala.toArray)
   }
 
-  def createImageFeatureToTensor(): ImageFeatureToTensor[T] = {
-    ImageFeatureToTensor()
-  }
-
   def createRowToImageFeature(): RowToImageFeature[T] = {
     RowToImageFeature()
   }
@@ -164,6 +160,18 @@ class PythonNNFrames[T: ClassTag](implicit ev: TensorNumeric[T]) extends PythonB
     estimator.setValidation(trigger, validationDF, vMethods.asScala.toArray, batchSize)
   }
 
+  def setEndWhen(estimator: NNEstimator[T], trigger: Trigger): NNEstimator[T] = {
+    estimator.setEndWhen(trigger)
+  }
+
+  def setCheckpoint(
+      estimator: NNEstimator[T],
+      path: String,
+      trigger: Trigger,
+      isOverWrite: Boolean): NNEstimator[T] = {
+    estimator.setCheckpoint(path, trigger, isOverWrite)
+  }
+
   def setValidationSummary(
       estimator: NNEstimator[T],
       value: ValidationSummary): NNEstimator[T] = {
@@ -191,5 +199,19 @@ class PythonNNFrames[T: ClassTag](implicit ev: TensorNumeric[T]) extends PythonB
       estimator: NNEstimator[T],
       clipNorm: Float): Unit = {
     estimator.setGradientClippingByL2Norm(clipNorm)
+  }
+
+  def saveNNModel(model: NNModel[T], path: String): Unit = {
+    model.save(path)
+  }
+
+  def loadNNModel(path: String): NNModel[_] = {
+    val loaded = NNModel.load(path)
+    println(loaded)
+    loaded
+  }
+
+  def loadNNClassifierModel(path: String): NNClassifierModel[_] = {
+    NNClassifierModel.load(path)
   }
 }

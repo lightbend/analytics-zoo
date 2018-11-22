@@ -5,7 +5,9 @@ This example demonstrates how to do image classification inference using a pre-t
 ## Environment
 * Tensorflow 1.8.0
 * Apache Spark 1.6.0/2.1.0 (This version needs to be same with the version you use to build Analytics Zoo)
-* Analytics Zoo 0.1.0
+
+## Install or download Analytics Zoo
+Follow the instructions [here](https://analytics-zoo.github.io/master/#PythonUserGuide/install/) to install analytics-zoo via __pip__ or __download the prebuilt package__.
 
 ## Install Tensorflow-Slim image classification model library and down the checkpoint
 
@@ -18,19 +20,21 @@ git clone https://github.com/tensorflow/models/
 
 Then download the InceptionV1 pre-trained checkpoint from [here](https://github.com/tensorflow/models/tree/master/research/slim#pre-trained-models)
 
+## Run Jupyter after pip install
 
-## Run with Jupyter
-* Download Analytics Zoo and build it.
+```bash
+export SPARK_DRIVER_MEMORY=8g
+jupyter notebook --notebook-dir=./ --ip=* --no-browser
+```
+
+## Run Jupyter with prebuilt package
 * Run `export SPARK_HOME=the root directory of Spark`.
 * Run `export ANALYTICS_ZOO_HOME=the dist directory under the Analytics Zoo project`.
+* Prepare the training dataset from https://www.kaggle.com/c/dogs-vs-cats and extract it.
 * Run the following bash command to start the jupyter notebook. Change parameter settings as you need, ie `MASTER = local[physcial_core_number]`.
 ```bash
 MASTER=local[*]
 ${ANALYTICS_ZOO_HOME}/bin/jupyter-with-zoo.sh \
     --master ${MASTER} \
-    --driver-cores 2  \
-    --driver-memory 8g  \
-    --total-executor-cores 2  \
-    --executor-cores 2  \
-    --executor-memory 8g
+    --driver-memory 8g 
 ```

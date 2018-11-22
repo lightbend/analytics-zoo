@@ -40,7 +40,7 @@ do
     cat $HYPERPARAMS_FILE_NAME
 
     echo "Starting training .."
-    analytics-zoo/scripts/spark-submit-with-zoo.sh dnn_anomaly_bigdl.py
+    analytics-zoo-0.3.0/bin/spark-submit-with-zoo.sh dnn_anomaly_bigdl.py dnn_anomaly_bigdl.py
     echo "Training done"
   
     # remove the generation complete file

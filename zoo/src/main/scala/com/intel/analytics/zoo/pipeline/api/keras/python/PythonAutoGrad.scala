@@ -18,13 +18,14 @@ package com.intel.analytics.zoo.pipeline.api.keras.python
 
 import java.util.{List => JList}
 
-import com.intel.analytics.bigdl.nn.abstractnn.{AbstractModule, Activity, TensorCriterion}
+import com.intel.analytics.bigdl.nn.abstractnn.{AbstractModule, Activity}
 import com.intel.analytics.bigdl.nn.keras.KerasLayer
 import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric
 import com.intel.analytics.bigdl.utils.Node
 import com.intel.analytics.zoo.pipeline.api.autograd
 import com.intel.analytics.zoo.pipeline.api.autograd._
 import com.intel.analytics.zoo.pipeline.api.keras.layers.Input
+import com.intel.analytics.zoo.pipeline.api.keras.objectives.TensorLossFunction
 
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
@@ -39,7 +40,7 @@ object PythonAutoGrad {
 class PythonAutoGrad[T: ClassTag](implicit ev: TensorNumeric[T]) extends PythonZooKeras[T] {
 
   def createZooKerasCustomLoss(inputs: JList[Variable[T]],
-      loss: Variable[T]): TensorCriterion[T] = {
+      loss: Variable[T]): TensorLossFunction[T] = {
     new CustomLossWithVariable[T](inputs.asScala.toArray, loss)
   }
 
@@ -120,8 +121,8 @@ class PythonAutoGrad[T: ClassTag](implicit ev: TensorNumeric[T]) extends PythonZ
     autograd.AutoGrad.abs(a)
   }
 
-  def sum(a: Variable[T], axis: Int = 0, keepdims: Boolean = false): Variable[T] = {
-    autograd.AutoGrad.sum(a, axis, keepdims)
+  def sum(a: Variable[T], axis: Int = 0, keepDims: Boolean = false): Variable[T] = {
+    autograd.AutoGrad.sum(a, axis, keepDims)
   }
 
   def clip(a: Variable[T], min: Double, max: Double): Variable[T] = {
@@ -164,6 +165,15 @@ class PythonAutoGrad[T: ClassTag](implicit ev: TensorNumeric[T]) extends PythonZ
     a.squeeze(dim)
   }
 
+  def squeeze(a: Variable[T], dims: JList[Int]): Variable[T] = {
+    if (dims == null) {
+      a.squeeze(null)
+    }
+    else {
+      a.squeeze(dims.asScala.toArray)
+    }
+  }
+
   def slice(a: Variable[T], dim: Int, startIndex: Int, length: Int): Variable[T] = {
     a.slice(dim, startIndex, length)
   }
@@ -198,5 +208,18 @@ class PythonAutoGrad[T: ClassTag](implicit ev: TensorNumeric[T]) extends PythonZ
 
   def contiguous(input: Variable[T]): Variable[T] = {
     autograd.AutoGrad.contiguous(input)
+  }
+
+  def mm(x: Variable[T], y: Variable[T], axes: JList[Int]): Variable[T] = {
+    autograd.AutoGrad.mm(x, y, if (axes != null) axes.asScala.toList else null)
+  }
+
+  def l2Normalize(x: Variable[T], axis: Int): Variable[T] = {
+    autograd.AutoGrad.l2Normalize(x, axis)
+  }
+
+  def batchDot(x: Variable[T], y: Variable[T], axes: JList[Int],
+          normalize: Boolean = false): Variable[T] = {
+    autograd.AutoGrad.batchDot(x, y, axes.asScala.toList, normalize)
   }
 }

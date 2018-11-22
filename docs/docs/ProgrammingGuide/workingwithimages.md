@@ -24,7 +24,7 @@ Python:
 from zoo.common.nncontext import *
 from zoo.pipeline.nnframes import *
 
-sc = init_nncontext(create_spark_conf().setAppName("app"))
+sc = init_nncontext("app")
 imageDF1 = NNImageReader.readImages("/tmp", sc)
 imageDF2 = NNImageReader.readImages("/tmp/*.jpg", sc)
 imageDF3 = NNImageReader.readImages("/tmp/a.jpg, /tmp/b.jpg", sc)
@@ -60,48 +60,48 @@ You can read image data as `ImageSet` from local/distributed image path, or you 
 
 ```scala
 // create LocalImageSet from an image folder
-val localImageFrame = ImageSet.read("/tmp/image/")
+val localImageSet = ImageSet.read("/tmp/image/")
 
-// create DistributedImageFrame from an image folder
-val distributedImageFrame2 = ImageSet.read("/tmp/image/", sc, 2)
+// create DistributedImageSet from an image folder
+val distributedImageSet2 = ImageSet.read("/tmp/image/", sc, 2)
 ```
 
 **Python example:**
 
 ```python
-# create LocalImageFrame from an image folder
+# create LocalImageSet from an image folder
 local_image_frame2 = ImageSet.read("/tmp/image/")
 
-# create DistributedImageFrame from an image folder
+# create DistributedImageSet from an image folder
 distributed_image_frame = ImageSet.read("/tmp/image/", sc, 2)
 ```
 
 ## Image Transformer
 Analytics Zoo has many pre-defined image processing transformers built on top of OpenCV:
 
-* `Brightness`: Adjust the image brightness.
-* `Hue`: Adjust the image hue.
-* `Saturation`: Adjust the image Saturation.
-* `Contrast`: Adjust the image Contrast.
-* `ChannelOrder`: Random change the channel order of an image
-* `ColorJitter`: Random adjust brightness, contrast, hue, saturation
-* `Resize`: Resize image
-* `AspectScale`: Resize the image, keep the aspect ratio. scale according to the short edge
-* `RandomAspectScale`: Resize the image by randomly choosing a scale
-* `ChannelNormalize`: Image channel normalize
-* `PixelNormalizer`: Pixel level normalizer
-* `CenterCrop`: Crop a `cropWidth` x `cropHeight` patch from center of image.
-* `RandomCrop`: Random crop a `cropWidth` x `cropHeight` patch from an image.
-* `FixedCrop`: Crop a fixed area of image
-* `DetectionCrop`: Crop from object detections, each image should has a tensor detection,
-* `Expand`: Expand image, fill the blank part with the meanR, meanG, meanB
-* `Filler`: Fill part of image with certain pixel value
-* `HFlip`: Flip the image horizontally
-* `RandomTransformer`: It is a wrapper for transformers to control the transform probability
-* `BytesToMat`: Transform byte array(original image file in byte) to OpenCVMat
-* `MatToFloats`: Transform OpenCVMat to float array, note that in this transformer, the mat is released.
-* `MatToTensor`: Transform opencv mat to tensor, note that in this transformer, the mat is released.
-* `ImageFrameToSample`: Transforms tensors that map inputKeys and targetKeys to sample, note that in this transformer, the mat has been released.
+* `ImageBrightness`: Adjust the image brightness.
+* `ImageHue`: Adjust the image hue.
+* `ImageSaturation`: Adjust the image Saturation.
+* `ImageContrast`: Adjust the image Contrast.
+* `ImageChannelOrder`: Random change the channel order of an image
+* `ImageColorJitter`: Random adjust brightness, contrast, hue, saturation
+* `ImageResize`: Resize image
+* `ImageAspectScale`: Resize the image, keep the aspect ratio. scale according to the short edge
+* `ImageRandomAspectScale`: Resize the image by randomly choosing a scale
+* `ImageChannelNormalize`: Image channel normalize
+* `ImagePixelNormalizer`: Pixel level normalizer
+* `ImageCenterCrop`: Crop a `cropWidth` x `cropHeight` patch from center of image.
+* `ImageRandomCrop`: Random crop a `cropWidth` x `cropHeight` patch from an image.
+* `ImageFixedCrop`: Crop a fixed area of image
+* `ImageDetectionCrop`: Crop from object detections, each image should has a tensor detection,
+* `ImageExpand`: Expand image, fill the blank part with the meanR, meanG, meanB
+* `ImageFiller`: Fill part of image with certain pixel value
+* `ImageHFlip`: Flip the image horizontally
+* `ImageRandomTransformer`: It is a wrapper for transformers to control the transform probability
+* `ImageBytesToMat`: Transform byte array(original image file in byte) to OpenCVMat
+* `ImageMatToFloats`: Transform OpenCVMat to float array, note that in this transformer, the mat is released.
+* `ImageMatToTensor`: Transform opencv mat to tensor, note that in this transformer, the mat is released.
+* `ImageSetToSample`: Transforms tensors that map inputKeys and targetKeys to sample, note that in this transformer, the mat has been released.
 
 More examples can be found [here](../APIGuide/FeatureEngineering/image.md)
 
@@ -125,7 +125,7 @@ val imgAug = ImageBytesToMat() -> ImageResize(256, 256)-> ImageCenterCrop(224, 2
 ```
 In the above example, the transformations will perform sequentially.
 
-Assume you have an ImageFrame containing original bytes array,
+Assume you have an ImageSet containing original bytes array,
 
 * `ImageBytesToMat` will transform the bytes array to `OpenCVMat`.
 
@@ -207,7 +207,7 @@ from zoo.pipeline.api.keras.models import *
 from zoo.pipeline.api.net import *
 from bigdl.optim.optimizer import *
 
-sc = init_nncontext(create_spark_conf().setAppName("train keras"))
+sc = init_nncontext("train keras")
 img_path="/tmp/image"
 image_set = ImageSet.read(img_path,sc, min_partitions=1)
 transformer = ChainedPreprocessing(
@@ -324,7 +324,7 @@ from zoo.pipeline.api.keras.models import *
 from zoo.pipeline.api.net import *
 from bigdl.optim.optimizer import *
 
-sc = init_nncontext(create_spark_conf().setAppName("train keras"))
+sc = init_nncontext("train keras")
 img_path="/tmp/image"
 image_set = ImageSet.read(img_path,sc, min_partitions=1)
 transformer = ChainedPreprocessing(
@@ -364,3 +364,6 @@ result = prediction.collect()
 You can load pre-trained Analytics-Zoo/BigDL model. Then call to `predictImageSet` to predict ImageSet.
 
 For details, you can check guide of [image classificaion](./image-classification.md) or [object detection](./object-detection.md)
+
+## 3D Image Support
+For 3D images, we can support above operations based on ImageSet. For details, please refer to [image API guide](../APIGuide/FeatureEngineering/image.md)

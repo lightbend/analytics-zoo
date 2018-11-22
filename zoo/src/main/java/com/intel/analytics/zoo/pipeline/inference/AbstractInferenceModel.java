@@ -16,43 +16,68 @@
 
 package com.intel.analytics.zoo.pipeline.inference;
 
+import scala.actors.threadpool.Arrays;
+
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public abstract class AbstractInferenceModel {
-  private FloatInferenceModel model;
-
-  private int supportedConcurrentNum = 1;
+public abstract class AbstractInferenceModel extends InferenceModel implements Serializable {
 
   public AbstractInferenceModel() {
+    super(1, null, null);
   }
 
   public AbstractInferenceModel(int supportedConcurrentNum) {
-    this.supportedConcurrentNum = supportedConcurrentNum;
+    super(supportedConcurrentNum, null, null);
   }
 
   public void load(String modelPath) {
-    load(modelPath, null);
+    doLoad(modelPath, null);
   }
 
   public void load(String modelPath, String weightPath) {
-    this.model = InferenceModelFactory.loadFloatInferenceModel(modelPath, weightPath);
+    doLoad(modelPath, weightPath);
+  }
+
+  public void loadCaffe(String modelPath) {
+    doLoadCaffe(modelPath, null);
+  }
+
+  public void loadCaffe(String modelPath, String weightPath) {
+    doLoadCaffe(modelPath, weightPath);
+  }
+
+  public void loadTF(String modelPath) {
+    doLoadTF(modelPath, 1, 1, true);
+  }
+
+  public void loadTF(String modelPath, int intraOpParallelismThreads, int interOpParallelismThreads, boolean usePerSessionThreads) {
+    doLoadTF(modelPath, intraOpParallelismThreads, interOpParallelismThreads, usePerSessionThreads);
   }
 
   public void reload(String modelPath) {
-    load(modelPath, null);
+    doReload(modelPath, null);
   }
 
   public void reload(String modelPath, String weightPath) {
-    this.model = InferenceModelFactory.loadFloatInferenceModel(modelPath, weightPath);
+    doReload(modelPath, weightPath);
   }
 
+  @Deprecated
   public List<Float> predict(List<Float> input, int... shape) {
     List<Integer> inputShape = new ArrayList<Integer>();
     for (int s : shape) {
       inputShape.add(s);
     }
-    return model.predict(input, inputShape);
+    return doPredict(input, inputShape);
   }
 
+  public List<List<JTensor>> predict(List<List<JTensor>> inputs) {
+    return doPredict(inputs);
+  }
+
+  public List<List<JTensor>> predict(List<JTensor>[] inputs) {
+    return predict(Arrays.asList(inputs));
+  }
 }

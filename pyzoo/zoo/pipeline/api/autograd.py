@@ -20,6 +20,7 @@ from bigdl.nn.layer import Layer, Node
 from bigdl.util.common import callBigDlFunc, to_list
 
 import zoo.pipeline.api.keras.base as kbase
+from zoo.pipeline.api.keras.objectives import LossFunction
 from zoo.pipeline.api.utils import remove_batch, toMultiShape
 
 if sys.version >= '3':
@@ -50,6 +51,41 @@ def abs(x):
     return Variable.from_jvalue(callBigDlFunc("float", "abs", x))
 
 
+def batch_dot(x, y, axes=1, normalize=False):
+    """
+    Operator that computes a dot product between samples in two tensors.
+
+    E.g. if applied to two tensors `a` and `b` of shape `(batch_size, n)`,
+    the output will be a tensor of shape `(batch_size, 1)`
+    where each entry `i` will be the dot product between
+    `a[i]` and `b[i]`.
+
+    :param x: Shape should only be [batch, xx]
+    :param y: Shape should only be [batch, xx]
+    :param axes: Integer or tuple of integers,
+                axis or axes along which to take the dot product.
+    :param normalize: Whether to L2-normalize samples along the
+                dot product axis before taking the dot product.
+                If set to True, then the output of the dot product
+                is the cosine proximity between the two samples.
+    :return: A variable.
+    """
+    if not normalize:
+        if isinstance(axes, int):
+            axes = [axes] * 2
+    return Variable.from_jvalue(callBigDlFunc("float", "batchDot", x, y, axes, normalize))
+
+
+def l2_normalize(x, axis):
+    """
+    Normalizes a tensor wrt the L2 norm alongside the specified axis.
+    :param x: A variable. Shape should only be [batch, xx]
+    :param axis: axis along which to perform normalization.
+    :return: A variable.
+    """
+    return Variable.from_jvalue(callBigDlFunc("float", "l2Normalize", x, int(axis)))
+
+
 def sum(x, axis=0, keepDims=False):
     """
     Sum of the values in a a variable, alongside the specified axis.
@@ -69,7 +105,7 @@ def stack(inputs, axis=1):
     Stacks a list of rank `R` tensors into a rank `R+1` tensor.
     You should start from 1 as dim 0 is for batch.
     :param inputs: List of variables (tensors).
-    :param axis: xis along which to perform stacking.
+    :param axis: axis along which to perform stacking.
     :return:
     """
     return Variable.from_jvalue(callBigDlFunc("float", "stack", inputs, axis))
@@ -80,7 +116,7 @@ def expand_dims(x, axis):
    Adds a 1-sized dimension at index "axis".
     :param x: a Variable to be expanded
     :param axis: axis Position where to add a new axis.
-    You should start from 1 as dim 0 is for batch.
+    The axis is 0 based and if you set the axis to 0, you would change the batch dim.
     """
     return Variable.from_jvalue(callBigDlFunc("float", "expandDims", x, axis))
 
@@ -101,7 +137,7 @@ def contiguous(x):
     Turn the output and grad to be contiguous for the input Variable
     :param x: A variable.
     """
-    return Variable.from_jvalue(callBigDlFunc("float", "softplus", x))
+    return Variable.from_jvalue(callBigDlFunc("float", "contiguous", x))
 
 
 def square(x):
@@ -195,25 +231,19 @@ def softplus(x):
     return Variable.from_jvalue(callBigDlFunc("float", "softplus", x))
 
 
-class Variable(kbase.ZooKerasCreator):
-    def __init__(self, input_shape, node=None, jvalue=None, name=None):
-        if jvalue:
-            self.value = jvalue
-            self.bigdl_type = "float"
-        else:
-            if node:
-                super(Variable, self).__init__(jvalue, "float", node, name)
-            else:
-                super(Variable, self).__init__(jvalue, "float", toMultiShape(input_shape), name)
+def mm(x, y, axes=None):
+    """
+    Module to perform matrix multiplication on two mini-batch inputs,
+    producing a mini-batch.
+    :param x: A variable.
+    :param y: A variable.
+    :param axes: Axes along which to perform multiplication.
+    :return: A variable.
+    """
+    return Variable.from_jvalue(callBigDlFunc("float", "mm", x, y, axes))
 
-    @classmethod
-    def from_node(cls, node):
-        return cls(input_shape=None, node=node)
 
-    @property
-    def node(self):
-        return Node.of(self.value.node())
-
+class VariableOperator(object):
     # TODO: we need to add a mapping for Shape here.
     def __to_batch_shape(cls, shape):
         return tuple([None] + shape[1:])
@@ -229,6 +259,10 @@ class Variable(kbase.ZooKerasCreator):
 
     def get_output_shape(self):
         return self.__process_shape(callBigDlFunc("float", "varGetOutputShape", self))
+
+    @property
+    def shape(self):
+        return self.get_output_shape()
 
     @staticmethod
     def from_jvalue(jvalue):
@@ -269,16 +303,6 @@ class Variable(kbase.ZooKerasCreator):
 
     def __neg__(self):
         return neg(self)
-
-    def squeeze(self, dim=None):
-        """
-        Delete the singleton dimension(s).
-        The batch dimension needs to be unchanged.
-        For example, if input has size (2, 1, 3, 4, 1):
-        Squeeze(dim = 1) will give output size (2, 3, 4, 1)
-        Squeeze(dims = null) will give output size (2, 3, 4)
-        """
-        return Variable.from_jvalue(callBigDlFunc("float", "squeeze", self, dim))
 
     def slice(self, dim, start_index, length):
         """
@@ -321,21 +345,39 @@ class Variable(kbase.ZooKerasCreator):
         """
         return Variable.from_jvalue(callBigDlFunc("float", "indexSelect", self, dim, index))
 
-    # TODO: we need a Shape mapping here.
-    def __to_batch_shape(cls, shape):
-        return tuple([None] + shape[1:])
+    def squeeze(self, dim=None):
+        """
+        Delete the singleton dimension(s).
+        The dim can be zero, and if so you would change the batch dim.
+        For example, if input has size (2, 1, 3, 4, 1):
+        Squeeze(dim = 1) will give output size (2, 3, 4, 1)
+        Squeeze(dims = null) will give output size (2, 3, 4)
+        """
+        return Variable.from_jvalue(callBigDlFunc("float", "squeeze", self, dim))
 
-    def __process_shape(self, shape):
-        if len(shape) == 1:
-            return self.__to_batch_shape(shape[0])
+
+class Variable(kbase.ZooKerasCreator, VariableOperator):
+    def __init__(self, input_shape, node=None, jvalue=None, name=None):
+        self.name = name
+        if jvalue:
+            self.value = jvalue
+            self.bigdl_type = "float"
         else:
-            return [self.__to_batch_shape(s) for s in shape]
+            if node:
+                super(Variable, self).__init__(jvalue, "float", node, name)
+            else:
+                super(Variable, self).__init__(jvalue, "float", toMultiShape(input_shape), name)
 
-    def get_input_shape(self):
-        return self.__process_shape(callBigDlFunc("float", "varGetInputShape", self))
+    def set_name(self, name):
+        self.node.element().set_name(name)
 
-    def get_output_shape(self):
-        return self.__process_shape(callBigDlFunc("float", "varGetOutputShape", self))
+    @classmethod
+    def from_node(cls, node):
+        return cls(input_shape=None, node=node)
+
+    @property
+    def node(self):
+        return Node.of(self.value.node())
 
 
 class Lambda(kbase.ZooKerasCreator):
@@ -396,7 +438,53 @@ class LambdaLayer(kbase.ZooKerasLayer):
                                           **kwargs)
 
 
-class CustomLoss(kbase.ZooKerasCreator):
+class Parameter(kbase.ZooKerasLayer, VariableOperator):
+    """
+    A trainable Variable. The default init_method is RandomUniform(-0.05, 0.05).
+    You can also specify the init_weight by passing a ndarray.
+    :param shape: Shape of this Parameter
+    :param init_method: A method used to initialize the Parameter.
+                        The default value is RandomUniform(-0.05, 0.05)
+    :param init_weight: A ndarray as the init value.
+    :param trainable It's true by default, meaning the value would be updated by gradient.
+    """
+    def __init__(self, shape, init_method=None,
+                 init_weight=None, trainable=True, **kwargs):
+        if not init_method:
+            from bigdl.nn.initialization_method import RandomUniform
+            init_method = RandomUniform(-0.05, 0.05)
+        super(Parameter, self).__init__(None,
+                                        list(shape),
+                                        init_method,
+                                        kbase.JTensor.from_ndarray(init_weight),
+                                        trainable,
+                                        ** kwargs)
+
+    @property
+    def shape(self):
+        return self.get_weight().shape
+
+    def get_weight(self):
+        """
+        :return: the ndarray for the current weight
+        """
+        jtensor = callBigDlFunc(self.bigdl_type,
+                                "getParameterWeight",
+                                self)
+        return jtensor.to_ndarray()
+
+    def set_weight(self, value):
+        """
+        :param value: value is a ndarray
+        :return:
+        """
+        callBigDlFunc(self.bigdl_type,
+                      "setParameterWeight",
+                      self,
+                      kbase.JTensor.from_ndarray(value))
+
+
+class CustomLoss(LossFunction):
     def __init__(self, loss_func, y_pred_shape, y_true_shape=None):
         """
         :param loss_func: a function which accept y_true and y_pred

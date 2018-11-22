@@ -44,7 +44,7 @@ class ImageSet(JavaValue):
 
     @classmethod
     def read(cls, path, sc=None, min_partitions=1, resize_height=-1,
-             resize_width=-1, bigdl_type="float"):
+             resize_width=-1, image_codec=-1, bigdl_type="float"):
         """
         Read images as Image Set
         if sc is defined, Read image as DistributedImageSet from local file system or HDFS
@@ -56,10 +56,13 @@ class ImageSet(JavaValue):
         :param min_partitions A suggestion value of the minimal splitting number for input data.
         :param resize_height height after resize, by default is -1 which will not resize the image
         :param resize_width width after resize, by default is -1 which will not resize the image
+        :param image_codec specifying the color type of a loaded image, same as in OpenCV.imread.
+               By default is Imgcodecs.CV_LOAD_IMAGE_UNCHANGED(-1)
         :return ImageSet
         """
         return ImageSet(jvalue=callBigDlFunc(bigdl_type, "readImageSet", path,
-                                             sc, min_partitions, resize_height, resize_width))
+                                             sc, min_partitions, resize_height,
+                                             resize_width, image_codec))
 
     @classmethod
     def from_image_frame(cls, image_frame, bigdl_type="float"):
@@ -72,11 +75,11 @@ class ImageSet(JavaValue):
         self.value = callBigDlFunc(bigdl_type, "transformImageSet", transformer, self.value)
         return self
 
-    def get_image(self, float_key="floats", to_chw=True):
+    def get_image(self, key="floats", to_chw=True):
         """
         get image from ImageSet
         """
-        return self.image_set.get_image(float_key, to_chw)
+        return self.image_set.get_image(key, to_chw)
 
     def get_label(self):
         """
@@ -109,15 +112,14 @@ class LocalImageSet(ImageSet):
                 if label_list else None
             self.value = callBigDlFunc(bigdl_type, JavaValue.jvm_class_constructor(self),
                                        image_tensor_list, label_tensor_list)
-
         self.bigdl_type = bigdl_type
 
-    def get_image(self, float_key="floats", to_chw=True):
+    def get_image(self, key="floats", to_chw=True):
         """
         get image list from ImageSet
         """
         tensors = callBigDlFunc(self.bigdl_type, "localImageSetToImageTensor",
-                                self.value, float_key, to_chw)
+                                self.value, key, to_chw)
         return list(map(lambda tensor: tensor.to_ndarray(), tensors))
 
     def get_label(self):
@@ -153,15 +155,14 @@ class DistributedImageSet(ImageSet):
                 if label_rdd else None
             self.value = callBigDlFunc(bigdl_type, JavaValue.jvm_class_constructor(self),
                                        image_tensor_rdd, label_tensor_rdd)
-
         self.bigdl_type = bigdl_type
 
-    def get_image(self, float_key="floats", to_chw=True):
+    def get_image(self, key="floats", to_chw=True):
         """
         get image rdd from ImageSet
         """
         tensor_rdd = callBigDlFunc(self.bigdl_type, "distributedImageSetToImageTensorRdd",
-                                   self.value, float_key, to_chw)
+                                   self.value, key, to_chw)
         return tensor_rdd.map(lambda tensor: tensor.to_ndarray())
 
     def get_label(self):
