@@ -80,7 +80,7 @@ print("Optimization Done.")
 Also remove all plot statements from the python script.
 
 ## Prepare docker image with the script
-First build an image for IntelBigDL using [dockerfile](,/docker/Dockerfile)
+First build an image for IntelBigDL using [dockerfile](../../../docker/Dockerfile)
 ````
 docker build \
     --build-arg ANALYTICS_ZOO_VERSION=0.3.0 \
